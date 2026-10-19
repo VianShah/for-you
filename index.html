@@ -1,0 +1,516 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>For You</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,400;0,500;1,400;1,500&family=Pinyon+Script&family=Jost:wght@300;400&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --cream: #fbf5ef;
+    --blush: #f3d9d4;
+    --rose: #d97b86;
+    --wine: #6e2337;
+    --ink: #3a2026;
+    --muted: #9a7a7f;
+    --serif: "Cormorant Garamond", Georgia, serif;
+    --script: "Pinyon Script", cursive;
+    --sans: "Jost", system-ui, sans-serif;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  html { scroll-behavior: smooth; }
+  body {
+    background: var(--cream);
+    color: var(--ink);
+    font-family: var(--sans);
+    font-weight: 300;
+    overflow-x: hidden;
+    -webkit-font-smoothing: antialiased;
+  }
+  @media (pointer: fine) { body, a, button { cursor: none; } }
+
+  /* soft paper grain */
+  body::before {
+    content: ""; position: fixed; inset: 0; pointer-events: none; z-index: 1; opacity: .35;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.9' numOctaves='2'/%3E%3CfeColorMatrix values='0 0 0 0 .4 0 0 0 0 .2 0 0 0 0 .2 0 0 0 .08 0'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+  }
+
+  /* ---------- progress line ---------- */
+  .progress { position: fixed; top: 0; left: 0; height: 2px; width: 100%; z-index: 50;
+    background: linear-gradient(90deg, var(--rose), var(--wine)); transform-origin: 0 50%; transform: scaleX(0); }
+
+  /* ---------- intro ---------- */
+  .intro {
+    min-height: 100svh; display: grid; place-items: center; text-align: center; padding: 24px 16px;
+    position: relative; overflow: hidden;
+    background: radial-gradient(ellipse at 50% 60%, var(--blush) 0%, var(--cream) 65%);
+  }
+  .intro .eyebrow { font-size: 12px; letter-spacing: .4em; text-transform: uppercase; color: var(--muted); }
+  .intro h1 {
+    font-family: var(--script); font-weight: 400; color: var(--wine);
+    font-size: clamp(72px, 16vw, 200px); line-height: 1; margin: 18px 0 10px;
+  }
+  .nick-line { display: block; font-size: clamp(44px, 9vw, 120px); color: var(--rose); min-height: 1.3em; margin-top: 4px; white-space: nowrap; }
+  .caret { display: inline-block; width: 2px; height: .8em; margin-left: 6px; background: var(--rose); vertical-align: -.05em; animation: blink 1s steps(1) infinite; }
+  @keyframes blink { 50% { opacity: 0; } }
+  .intro p { font-family: var(--serif); font-style: italic; font-size: clamp(20px, 2.6vw, 28px); color: var(--ink); }
+  .intro .fade { opacity: 0; transform: translateY(18px); animation: rise 1.4s cubic-bezier(.2,.7,.2,1) forwards; }
+  .intro .fade:nth-child(2) { animation-delay: .3s; }
+  .intro .fade:nth-child(3) { animation-delay: .7s; }
+  @keyframes rise { to { opacity: 1; transform: none; } }
+
+  .scroll-hint { position: absolute; bottom: 32px; left: 50%; transform: translateX(-50%);
+    font-size: 11px; letter-spacing: .35em; text-transform: uppercase; color: var(--muted);
+    display: flex; flex-direction: column; align-items: center; gap: 12px; opacity: 0; animation: rise 1s 1.4s forwards; }
+  .scroll-hint span { width: 1px; height: 48px; background: linear-gradient(var(--rose), transparent); animation: drip 2s infinite; transform-origin: top; }
+  @keyframes drip { 0% { transform: scaleY(0); } 50% { transform: scaleY(1); } 100% { transform: scaleY(1); opacity: 0; } }
+
+  .petal { position: absolute; color: var(--rose); opacity: .18; animation: drift linear infinite; pointer-events: none; }
+  @keyframes drift { from { transform: translateY(110vh) rotate(0); } to { transform: translateY(-20vh) rotate(360deg); } }
+
+  /* ---------- horizontal gallery ---------- */
+  .gallery { position: relative; }
+  .gallery .sticky { position: sticky; top: 0; height: 100svh; overflow: hidden; display: flex; align-items: center; }
+  .track { display: flex; align-items: center; gap: clamp(24px, 4vw, 64px); padding: 0 8vw; will-change: transform; }
+  .panel-title { flex: 0 0 auto; width: min(80vw, 460px); }
+  .panel-title small { font-size: 12px; letter-spacing: .4em; text-transform: uppercase; color: var(--muted); }
+  .panel-title h2 { font-family: var(--serif); font-weight: 400; font-size: clamp(44px, 6vw, 84px); line-height: 1.02; margin-top: 16px; }
+  .panel-title h2 em { font-family: var(--script); font-style: normal; color: var(--wine); font-size: 1.15em; }
+  .panel-title p { margin-top: 20px; color: var(--muted); font-size: 15px; letter-spacing: .02em; }
+
+  .frame { flex: 0 0 auto; position: relative; }
+  .frame:nth-child(odd)  { transform: translateY(4vh); }
+  .frame:nth-child(even) { transform: translateY(-4vh); }
+  .frame .photo {
+    width: clamp(260px, 34vw, 520px); height: clamp(340px, 62svh, 640px);
+    overflow: hidden; border-radius: 4px; position: relative;
+    box-shadow: 0 30px 60px -30px rgba(110,35,55,.45);
+    background: linear-gradient(135deg, var(--blush), #e9c1bf);
+  }
+  .frame.wide .photo { width: clamp(300px, 46vw, 720px); height: clamp(260px, 48svh, 500px); }
+  .frame img { position: absolute; inset: 0; width: 120%; height: 100%; left: -10%; object-fit: cover; will-change: transform; transition: filter .6s; filter: saturate(.92); }
+  .frame:hover img { filter: saturate(1.08); }
+  .frame figcaption { margin-top: 18px; font-family: var(--serif); font-style: italic; font-size: 20px; color: var(--ink); }
+  .frame figcaption b { display: block; font-family: var(--sans); font-style: normal; font-weight: 400; font-size: 11px; letter-spacing: .3em; color: var(--rose); margin-bottom: 4px; }
+  .panel-end { flex: 0 0 auto; width: min(70vw, 380px); font-family: var(--script); font-size: clamp(40px, 5vw, 64px); color: var(--wine); line-height: 1.1; }
+
+  .gallery-count { position: absolute; bottom: 28px; right: 8vw; font-size: 12px; letter-spacing: .3em; color: var(--muted); }
+
+  /* ---------- little things ---------- */
+  section.things { padding: clamp(100px, 18vh, 180px) 16px; max-width: 980px; margin: 0 auto; }
+  .label { font-size: 12px; letter-spacing: .4em; text-transform: uppercase; color: var(--muted); text-align: center; }
+  .things h2 { font-family: var(--serif); font-weight: 400; text-align: center; font-size: clamp(36px, 5vw, 64px); margin: 14px 0 70px; }
+  .things ol { list-style: none; display: grid; gap: 0; }
+  .things li {
+    display: grid; grid-template-columns: 70px 1fr; gap: 16px; align-items: baseline;
+    padding: 28px 0; border-top: 1px solid rgba(110,35,55,.14);
+    font-family: var(--serif); font-size: clamp(24px, 3.2vw, 38px); line-height: 1.25;
+  }
+  .things li:last-child { border-bottom: 1px solid rgba(110,35,55,.14); }
+  .things li.home { font-style: italic; color: var(--wine); }
+  .things li span { font-family: var(--sans); font-size: 12px; letter-spacing: .2em; color: var(--rose); }
+
+  .reveal { opacity: 0; transform: translateY(40px); transition: opacity 1.1s cubic-bezier(.2,.7,.2,1), transform 1.1s cubic-bezier(.2,.7,.2,1); }
+  .reveal.in { opacity: 1; transform: none; }
+
+  /* ---------- word-by-word scroll text ---------- */
+  .words { min-height: 220vh; position: relative; background: var(--wine); color: var(--cream); }
+  .words .sticky { position: sticky; top: 0; height: 100svh; display: grid; place-items: center; padding: 0 16px; }
+  .words p { max-width: 900px; font-family: var(--serif); font-size: clamp(28px, 4.4vw, 58px); line-height: 1.22; text-align: center; }
+  .words p .w { opacity: .14; transition: opacity .3s; }
+  .words p .w.on { opacity: 1; }
+  .words p .w.hl { font-style: italic; color: #f7b8c0; }
+
+  /* ---------- heart draw ---------- */
+  .finale { min-height: 260vh; position: relative; }
+  .finale .sticky { position: sticky; top: 0; height: 100svh; display: grid; place-items: center; text-align: center; padding: 0 16px; overflow: hidden; }
+  .finale svg { width: min(62vw, 360px); height: auto; overflow: visible; }
+  .finale path { fill: none; stroke: var(--rose); stroke-width: 1.4; stroke-linecap: round; }
+  .finale .fill { fill: var(--rose); stroke: none; opacity: 0; transform-origin: center; }
+  .finale h3 { font-family: var(--script); font-weight: 400; color: var(--wine); font-size: clamp(42px, 6.5vw, 86px); line-height: 1.1; margin-top: 24px; opacity: 0; transform: translateY(20px); transition: all 1s; }
+  .finale h3.in { opacity: 1; transform: none; }
+  .finale-inner { position: relative; }
+
+  /* ---------- envelope ---------- */
+  .letter { padding: 120px 16px 160px; display: grid; place-items: center; text-align: center;
+    background: linear-gradient(var(--cream), var(--blush)); }
+  .letter .label { margin-bottom: 40px; }
+  .envelope { position: relative; width: min(88vw, 420px); aspect-ratio: 1.55; border: none; background: none; perspective: 1000px; }
+  .env-back { position: absolute; inset: 0; background: #e8b8b6; border-radius: 6px; }
+  .env-card {
+    position: absolute; left: 6%; right: 6%; top: 8%; bottom: 8%; background: #fffaf6; border-radius: 4px;
+    padding: 26px 22px; display: grid; place-items: center; transition: transform 1s cubic-bezier(.2,.7,.2,1) .35s;
+    box-shadow: 0 10px 30px -10px rgba(110,35,55,.3);
+  }
+  .env-card p { font-family: var(--serif); font-style: italic; font-size: clamp(17px, 2.2vw, 21px); line-height: 1.5; color: var(--ink); }
+  .env-card .sign { font-family: var(--script); font-style: normal; font-size: 32px; color: var(--wine); display: block; margin-top: 8px; }
+  .env-front { position: absolute; inset: 0; border-radius: 6px; overflow: hidden; pointer-events: none;
+    background:
+      linear-gradient(to top right, #f0c7c4 50%, transparent 50.5%) left / 50.5% 100% no-repeat,
+      linear-gradient(to top left, #f0c7c4 50%, transparent 50.5%) right / 50.5% 100% no-repeat,
+      linear-gradient(to top, #ecc0bd 0 0) bottom / 100% 0 no-repeat; }
+  .env-flap { position: absolute; left: 0; right: 0; top: 0; height: 58%; transform-origin: top; transition: transform .7s cubic-bezier(.4,0,.2,1), z-index 0s .35s;
+    background: linear-gradient(to bottom, #dda6a5, #e3afae); clip-path: polygon(0 0, 100% 0, 50% 100%); z-index: 3; }
+  .seal { position: absolute; left: 50%; top: 52%; transform: translate(-50%,-50%); z-index: 4; width: 54px; height: 54px; border-radius: 50%;
+    background: var(--wine); color: var(--blush); display: grid; place-items: center; font-size: 22px; transition: opacity .3s;
+    box-shadow: 0 4px 10px rgba(0,0,0,.2); }
+  .envelope.open .env-flap { transform: rotateX(180deg); z-index: 0; }
+  .envelope.open .seal { opacity: 0; }
+  .envelope.open .env-card { transform: translateY(-62%); z-index: 2; }
+  .tap { margin-top: 36px; font-size: 12px; letter-spacing: .35em; text-transform: uppercase; color: var(--muted); transition: opacity .4s; }
+  .envelope.open + .tap { opacity: 0; }
+  .letter { padding-top: 200px; }
+
+  footer { text-align: center; padding: 40px 16px; font-size: 12px; letter-spacing: .3em; color: var(--muted); background: var(--blush); }
+
+  /* ---------- cursor + hearts ---------- */
+  .cursor { position: fixed; left: 0; top: 0; z-index: 100; pointer-events: none; width: 22px; height: 22px; margin: -11px 0 0 -11px;
+    color: var(--wine); transition: width .3s, height .3s, margin .3s, color .3s; }
+  .cursor svg { width: 100%; height: 100%; display: block; }
+  .cursor.big { width: 44px; height: 44px; margin: -22px 0 0 -22px; color: var(--rose); }
+  .cursor.light { color: var(--cream); }
+  @media (pointer: coarse) { .cursor { display: none; } }
+
+  .heart { position: fixed; left: 0; top: 0; z-index: 99; pointer-events: none; will-change: transform, opacity; }
+  .heart svg { display: block; width: 100%; height: 100%; }
+
+  @media (max-width: 640px) {
+    .things li { grid-template-columns: 44px 1fr; }
+    .frame:nth-child(odd), .frame:nth-child(even) { transform: none; }
+    .frame .photo, .frame.wide .photo { width: 76vw; height: 58svh; }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    *, *::before, *::after { animation: none !important; transition: none !important; }
+    .intro .fade, .scroll-hint { opacity: 1; transform: none; }
+    .reveal { opacity: 1; transform: none; }
+  }
+</style>
+</head>
+<body>
+
+<div class="progress" id="progress"></div>
+<div class="cursor" id="cursor"><svg viewBox="0 0 24 24"><path fill="currentColor" d="M12 21s-7.5-4.6-9.6-9.2C.9 8.4 3 4.5 6.7 4.5c2.1 0 3.6 1.2 4.3 2.4h2c.7-1.2 2.2-2.4 4.3-2.4 3.7 0 5.8 3.9 4.3 7.3C19.5 16.4 12 21 12 21z"/></svg></div>
+
+<!-- ============ INTRO ============ -->
+<header class="intro" id="intro">
+  <div>
+    <div class="eyebrow fade">a small something</div>
+    <h1 class="fade">Heyyy<span class="nick-line"><span id="nick"></span><span class="caret"></span></span></h1>
+    <p class="fade">I made you a little place. Scroll slowly.</p>
+  </div>
+  <div class="scroll-hint">scroll<span></span></div>
+</header>
+
+<!-- ============ HORIZONTAL GALLERY (hero) ============ -->
+<section class="gallery" id="gallery">
+  <div class="sticky">
+    <div class="track" id="track">
+      <div class="panel-title">
+        <small>chapter one</small>
+        <h2>A few of my <em>favourite</em> things</h2>
+        <p>(all of them have you in them)</p>
+      </div>
+      <!-- frames are inserted from the PHOTOS list in the script below -->
+      <div class="panel-end" id="panelEnd">…and every<br>day still to come.</div>
+    </div>
+    <div class="gallery-count" id="count"></div>
+  </div>
+</section>
+
+<!-- ============ LITTLE THINGS ============ -->
+<section class="things">
+  <div class="label reveal">things I'm keeping forever</div>
+  <h2 class="reveal">The little things</h2>
+  <ol>
+    <li class="reveal"><span>01</span>Back-cracking hugs that fix my whole day.</li>
+    <li class="reveal"><span>02</span>Big, wet, ridiculous kisses on my cheek.</li>
+    <li class="reveal"><span>03</span>Forehead kisses that say everything without a word.</li>
+    <li class="reveal"><span>04</span>Falling asleep on your lap like nothing else exists.</li>
+    <li class="reveal"><span>05</span>You asleep on me, and me not daring to move an inch.</li>
+    <li class="reveal home"><span>06</span>And hugs that feel like home.</li>
+  </ol>
+</section>
+
+<!-- ============ WORD-BY-WORD ============ -->
+<section class="words" id="words">
+  <div class="sticky">
+    <p id="wordText">Some days feel heavier than others. On those days, come here. Let me hold you until the heavy part gets lighter. You never have to carry it *alone.* You are *enough,* exactly as you are, right now.</p>
+  </div>
+</section>
+
+<!-- ============ HEART DRAW ============ -->
+<section class="finale" id="finale">
+  <div class="sticky">
+    <div class="finale-inner">
+      <svg viewBox="0 0 200 180" id="heartSvg">
+        <path class="fill" id="heartFill" d="M100 168 C 60 140, 8 108, 8 58 C 8 28, 30 8, 56 8 C 76 8, 92 20, 100 36 C 108 20, 124 8, 144 8 C 170 8, 192 28, 192 58 C 192 108, 140 140, 100 168 Z"/>
+        <path id="heartLine" d="M100 168 C 60 140, 8 108, 8 58 C 8 28, 30 8, 56 8 C 76 8, 92 20, 100 36 C 108 20, 124 8, 144 8 C 170 8, 192 28, 192 58 C 192 108, 140 140, 100 168 Z"/>
+      </svg>
+      <h3 id="finaleText">You are my favourite<br>place to come home to.</h3>
+    </div>
+  </div>
+</section>
+
+<!-- ============ LETTER ============ -->
+<section class="letter">
+  <div class="label reveal">one more thing</div>
+  <button class="envelope reveal" id="envelope" aria-label="Open the letter">
+    <div class="env-back"></div>
+    <div class="env-card">
+      <p>Whatever today looks like, I'm in your corner. I always have been, and I always will be.
+        <span class="sign">Yours, always</span></p>
+    </div>
+    <div class="env-front"></div>
+    <div class="env-flap"></div>
+    <div class="seal">♥</div>
+  </button>
+  <div class="tap">tap to open</div>
+</section>
+
+<footer>made with every bit of me</footer>
+
+<script>
+/* ==========================================================
+   EDIT HERE: your photos + captions.
+   Put your pictures in the "photos" folder as 1.jpg, 2.jpg …
+   (or change the file names below). Until a photo exists,
+   a placeholder image is shown instead.
+   wide: true  → landscape frame,  false → portrait frame
+   pos: which part of the photo stays in view ("50% 50%" = centre,
+        "50% 75%" = lower part) — handy for tall screenshots
+   ========================================================== */
+const PHOTOS = [
+  { src: "photos/1.jpg", tag: "BY THE SEA",     caption: "You, collecting us", wide: false },
+  { src: "photos/2.jpg", tag: "CENTRAL PERK",   caption: "Could I BE any luckier?", wide: true },
+  { src: "photos/3.jpg", tag: "THAT LOOK",      caption: "You know exactly which one", wide: false, pos: "50% 35%" },
+  { src: "photos/4.jpg", tag: "ORDINARY DAYS",  caption: "Dessert finished, hand still here", wide: false, pos: "50% 62%" },
+  { src: "photos/5.jpg", tag: "THE POUT",       caption: "Always ready, somehow", wide: true },
+  { src: "photos/6.png", tag: "FACETIME FACES", caption: "Even this one. Especially this one.", wide: false, pos: "50% 78%" },
+  { src: "photos/7.jpg", tag: "US",             caption: "My favourite place to sit", wide: false, pos: "50% 60%" },
+  { src: "photos/8.png", tag: "YOUR LAUGH",     caption: "My favourite view, even on a tiny screen", wide: false, pos: "50% 62%" },
+];
+
+const reduceMotion = matchMedia("(prefers-reduced-motion: reduce)").matches;
+const finePointer = matchMedia("(pointer: fine)").matches;
+const HEART_PATH = "M12 21s-7.5-4.6-9.6-9.2C.9 8.4 3 4.5 6.7 4.5c2.1 0 3.6 1.2 4.3 2.4h2c.7-1.2 2.2-2.4 4.3-2.4 3.7 0 5.8 3.9 4.3 7.3C19.5 16.4 12 21 12 21z";
+const COLORS = ["#d97b86", "#e8a0a8", "#6e2337", "#f3b6bd", "#c4566a"];
+
+/* ---------- build gallery ---------- */
+const track = document.getElementById("track");
+const panelEnd = document.getElementById("panelEnd");
+PHOTOS.forEach((p, i) => {
+  const fig = document.createElement("figure");
+  fig.className = "frame" + (p.wide ? " wide" : "");
+  const img = new Image();
+  img.alt = p.caption;
+  img.loading = i < 2 ? "eager" : "lazy";
+  img.onerror = () => { img.onerror = null; img.src = `https://picsum.photos/seed/forher${i + 1}/900/1100`; };
+  img.src = p.src;
+  if (p.pos) img.style.objectPosition = p.pos;
+  const box = document.createElement("div");
+  box.className = "photo";
+  box.appendChild(img);
+  const cap = document.createElement("figcaption");
+  cap.innerHTML = `<b>${String(i + 1).padStart(2, "0")} — ${p.tag}</b>${p.caption}`;
+  fig.append(box, cap);
+  track.insertBefore(fig, panelEnd);
+});
+const frames = [...track.querySelectorAll(".frame")];
+const gallery = document.getElementById("gallery");
+const count = document.getElementById("count");
+
+function sizeGallery() {
+  const dist = track.scrollWidth - innerWidth;
+  gallery.style.height = (dist + innerHeight) + "px";
+}
+
+/* ---------- word-by-word text ---------- */
+const wordText = document.getElementById("wordText");
+wordText.innerHTML = wordText.textContent.trim().split(/\s+/).map(w => {
+  const hl = w.startsWith("*");
+  return `<span class="w${hl ? " hl" : ""}">${w.replace(/\*/g, "")}</span>`;
+}).join(" ");
+const words = [...wordText.querySelectorAll(".w")];
+const wordsSec = document.getElementById("words");
+
+/* ---------- heart draw ---------- */
+const finale = document.getElementById("finale");
+const heartLine = document.getElementById("heartLine");
+const heartFill = document.getElementById("heartFill");
+const finaleText = document.getElementById("finaleText");
+const heartLen = heartLine.getTotalLength();
+heartLine.style.strokeDasharray = heartLen;
+heartLine.style.strokeDashoffset = heartLen;
+let finaleBurstDone = false;
+
+/* ---------- scroll loop ---------- */
+const progressBar = document.getElementById("progress");
+const clamp = (v, a = 0, b = 1) => Math.min(b, Math.max(a, v));
+function sectionProgress(el) {
+  const r = el.getBoundingClientRect();
+  return clamp(-r.top / (r.height - innerHeight));
+}
+
+function onScroll() {
+  const docH = document.documentElement.scrollHeight - innerHeight;
+  progressBar.style.transform = `scaleX(${scrollY / docH})`;
+
+  // horizontal gallery
+  const gp = sectionProgress(gallery);
+  const dist = track.scrollWidth - innerWidth;
+  track.style.transform = `translate3d(${-gp * dist}px,0,0)`;
+  let active = 0;
+  frames.forEach((f, i) => {
+    const r = f.getBoundingClientRect();
+    const center = (r.left + r.width / 2) / innerWidth - .5; // -0.5 … 0.5 across the screen
+    f.querySelector("img").style.transform = `translate3d(${center * -12}%,0,0) scale(${1.05 - Math.abs(center) * .06})`;
+    if (r.left < innerWidth * .6) active = i;
+  });
+  count.textContent = `${String(active + 1).padStart(2, "0")} / ${String(frames.length).padStart(2, "0")}`;
+
+  // words
+  const wp = sectionProgress(wordsSec);
+  const lit = Math.floor(wp * 1.15 * words.length);
+  words.forEach((w, i) => w.classList.toggle("on", i < lit));
+
+  // heart
+  const hp = sectionProgress(finale);
+  heartLine.style.strokeDashoffset = heartLen * (1 - clamp(hp / .6));
+  const fillP = clamp((hp - .55) / .2);
+  heartFill.style.opacity = fillP * .9;
+  heartFill.style.transform = `scale(${.9 + fillP * .1})`;
+  finaleText.classList.toggle("in", hp > .7);
+  if (hp > .75 && !finaleBurstDone) {
+    finaleBurstDone = true;
+    const r = document.getElementById("heartSvg").getBoundingClientRect();
+    burst(r.left + r.width / 2, r.top + r.height / 2, 28);
+  }
+  if (hp < .5) finaleBurstDone = false;
+
+  // cursor colour on dark section
+  const wr = wordsSec.getBoundingClientRect();
+  cursor.classList.toggle("light", my > wr.top && my < wr.bottom);
+}
+
+let ticking = false;
+addEventListener("scroll", () => {
+  if (!ticking) { ticking = true; requestAnimationFrame(() => { onScroll(); ticking = false; }); }
+}, { passive: true });
+// Phones fire "resize" when the address bar slides in/out while scrolling;
+// only re-measure when the width really changes so the gallery doesn't jump.
+let lastW = innerWidth;
+addEventListener("resize", () => {
+  if (innerWidth !== lastW) { lastW = innerWidth; sizeGallery(); }
+  onScroll();
+});
+
+/* ---------- reveal on scroll ---------- */
+const io = new IntersectionObserver(entries => {
+  entries.forEach(e => { if (e.isIntersecting) { e.target.classList.add("in"); io.unobserve(e.target); } });
+}, { threshold: .2 });
+document.querySelectorAll(".reveal").forEach((el, i) => {
+  el.style.transitionDelay = (el.tagName === "LI" ? (i % 6) * 0.08 : 0) + "s";
+  io.observe(el);
+});
+
+/* ---------- cursor + heart trail ---------- */
+const cursor = document.getElementById("cursor");
+let mx = innerWidth / 2, my = innerHeight / 2, cx = mx, cy = my;
+let lastX = mx, lastY = my, liveHearts = 0;
+
+function spawnHeart(x, y, { size, vx, vy, life } = {}) {
+  if (reduceMotion || liveHearts > 70) return;
+  liveHearts++;
+  const s = size || 8 + Math.random() * 14;
+  const el = document.createElement("div");
+  el.className = "heart";
+  el.style.width = el.style.height = s + "px";
+  el.innerHTML = `<svg viewBox="0 0 24 24"><path fill="${COLORS[Math.random() * COLORS.length | 0]}" d="${HEART_PATH}"/></svg>`;
+  document.body.appendChild(el);
+  const dx = vx ?? (Math.random() - .5) * 60;
+  const dy = vy ?? -(40 + Math.random() * 70);
+  const rot = (Math.random() - .5) * 60;
+  const anim = el.animate([
+    { transform: `translate(${x - s / 2}px,${y - s / 2}px) scale(.2) rotate(0deg)`, opacity: 0 },
+    { transform: `translate(${x - s / 2 + dx * .2}px,${y - s / 2 + dy * .2}px) scale(1) rotate(${rot * .3}deg)`, opacity: .95, offset: .15 },
+    { transform: `translate(${x - s / 2 + dx}px,${y - s / 2 + dy}px) scale(.6) rotate(${rot}deg)`, opacity: 0 }
+  ], { duration: life || 1100 + Math.random() * 700, easing: "cubic-bezier(.2,.6,.3,1)" });
+  anim.onfinish = () => { el.remove(); liveHearts--; };
+}
+
+function burst(x, y, n = 16) {
+  for (let i = 0; i < n; i++) {
+    const a = (i / n) * Math.PI * 2 + Math.random() * .3;
+    const d = 80 + Math.random() * 120;
+    spawnHeart(x, y, { size: 12 + Math.random() * 18, vx: Math.cos(a) * d, vy: Math.sin(a) * d - 40, life: 1400 + Math.random() * 600 });
+  }
+}
+
+function trail(x, y) {
+  if (Math.hypot(x - lastX, y - lastY) > 22) {
+    spawnHeart(x, y);
+    lastX = x; lastY = y;
+  }
+}
+
+addEventListener("mousemove", e => { mx = e.clientX; my = e.clientY; trail(mx, my); }, { passive: true });
+addEventListener("touchmove", e => { const t = e.touches[0]; my = t.clientY; trail(t.clientX, t.clientY); }, { passive: true });
+addEventListener("click", e => { if (!e.target.closest("#envelope")) burst(e.clientX, e.clientY, 10); });
+
+document.addEventListener("mouseover", e => {
+  cursor.classList.toggle("big", !!e.target.closest(".photo, button, a"));
+});
+
+(function follow() {
+  cx += (mx - cx) * .2; cy += (my - cy) * .2;
+  cursor.style.transform = `translate3d(${cx}px,${cy}px,0)`;
+  requestAnimationFrame(follow);
+})();
+
+/* ---------- envelope ---------- */
+const envelope = document.getElementById("envelope");
+envelope.addEventListener("click", e => {
+  if (envelope.classList.contains("open")) return;
+  envelope.classList.add("open");
+  const r = envelope.getBoundingClientRect();
+  setTimeout(() => burst(r.left + r.width / 2, r.top + r.height * .3, 30), 600);
+});
+
+/* ---------- typed nicknames in the headline (edit the list freely) ---------- */
+const NICKNAMES = ["smartyyyy", "cutuuuu", "pottyyyy", "baby hippopotamus", "darling", "wifeyyyy"];
+const nick = document.getElementById("nick");
+(function typeNames(n = 0) {
+  const name = NICKNAMES[n % NICKNAMES.length];
+  if (reduceMotion) { nick.textContent = name; return setTimeout(() => typeNames(n + 1), 2200); }
+  let i = 0;
+  (function type() {
+    nick.textContent = name.slice(0, ++i);
+    if (i < name.length) return setTimeout(type, 85 + Math.random() * 60);
+    setTimeout(function erase() {
+      nick.textContent = name.slice(0, --i);
+      if (i > 0) return setTimeout(erase, 40);
+      setTimeout(() => typeNames(n + 1), 300);
+    }, 1700);
+  })();
+})();
+
+/* ---------- drifting background hearts in intro ---------- */
+const intro = document.getElementById("intro");
+if (!reduceMotion) for (let i = 0; i < 14; i++) {
+  const p = document.createElement("div");
+  p.className = "petal";
+  const s = 10 + Math.random() * 26;
+  p.style.cssText = `left:${Math.random() * 100}%;width:${s}px;height:${s}px;animation-duration:${14 + Math.random() * 16}s;animation-delay:${-Math.random() * 30}s`;
+  p.innerHTML = `<svg viewBox="0 0 24 24"><path fill="currentColor" d="${HEART_PATH}"/></svg>`;
+  intro.appendChild(p);
+}
+
+/* ---------- init ---------- */
+sizeGallery();
+onScroll();
+addEventListener("load", () => { sizeGallery(); onScroll(); });
+</script>
+</body>
+</html>
