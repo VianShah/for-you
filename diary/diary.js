@@ -1,144 +1,13 @@
-/* ==========================================================
-   Our little diary
-   Every page is saved straight into the GitHub repo:
-     diary/entries.json  → list of all pages (text, styles, stickers)
-     diary/media/…       → pictures and voice notes
-   Writing needs the diary key (a fine-grained GitHub token that
-   only has "Contents: read & write" on this one repo). It's kept
-   in this browser only — never in the code.
-   ========================================================== */
-// The two people who write in this diary — change the second name to hers.
-const PEOPLE = ["Vian", "Wifeyyyy"];
-const OWNER = "VianShah";
-const REPO = "for-you";
-const BRANCH = "main";
-const INDEX = "diary/entries.json";
-const MEDIA_DIR = "diary/media/";
+/* The diary page. Shared helpers live in core.js, questions in questions.js. */
 const STICKERS = ["❤️", "💋", "🧸", "🦛", "☕", "🍫", "🌸", "✨", "🌙", "🫶", "🥹", "😘", "🎀", "💌", "📸", "🌊", "🌷", "⭐", "🍓", "🐻"];
 const TAPE_COLORS = ["#f3b6bd", "#f7d58b", "#b9d8c2", "#b8c9ee", "#e6c3f0"];
 const MAX_VOICE_SECONDS = 300;
 
-// On a local preview, read from the files next to this page instead of GitHub.
-const LOCAL = ["localhost", "127.0.0.1"].includes(location.hostname);
-const reduceMotion = matchMedia("(prefers-reduced-motion: reduce)").matches;
-
-const $ = (s, el = document) => el.querySelector(s);
-const $$ = (s, el = document) => [...el.querySelectorAll(s)];
-const esc = s => String(s ?? "").replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
-
-/* ---------- per-device settings (may be unavailable in private mode) ---------- */
-const store = {
-  get(k) { try { return localStorage.getItem(k) || ""; } catch { return ""; } },
-  set(k, v) { try { v ? localStorage.setItem(k, v) : localStorage.removeItem(k); } catch {} },
-};
-let KEY = store.get("diary-key");
-let NAME = PEOPLE.includes(store.get("diary-name")) ? store.get("diary-name") : "";
-
-// One-tap setup: opening …/diary/#pair=<key> unlocks this phone, then the key
-// is wiped from the address bar so it isn't left in history or screenshots.
-let justPaired = false;
-if (location.hash.startsWith("#pair=")) {
-  KEY = decodeURIComponent(location.hash.slice(6)).trim();
-  store.set("diary-key", KEY);
-  history.replaceState(null, "", location.pathname + location.search);
-  justPaired = true;
-}
-
-/* ---------- GitHub helpers ---------- */
-const API = `https://api.github.com/repos/${OWNER}/${REPO}/contents/`;
-function headers() {
-  const h = { Accept: "application/vnd.github+json" };
-  if (KEY) h.Authorization = `Bearer ${KEY}`;
-  return h;
-}
-function toB64(str) {
-  const bytes = new TextEncoder().encode(str);
-  let bin = "";
-  for (let i = 0; i < bytes.length; i += 0x8000) bin += String.fromCharCode(...bytes.subarray(i, i + 0x8000));
-  return btoa(bin);
-}
-function fromB64(b64) {
-  const bin = atob(b64.replace(/\n/g, ""));
-  return new TextDecoder().decode(Uint8Array.from(bin, c => c.charCodeAt(0)));
-}
-function blobToB64(blob) {
-  return new Promise((res, rej) => {
-    const r = new FileReader();
-    r.onload = () => res(String(r.result).split(",")[1]);
-    r.onerror = rej;
-    r.readAsDataURL(blob);
-  });
-}
-async function ghError(res) {
-  let msg = `GitHub said ${res.status}`;
-  try { msg += ": " + (await res.json()).message; } catch {}
-  if (res.status === 401) msg = "The diary key isn't working. Check it in ⚙ settings.";
-  if (res.status === 403 || res.status === 404) msg = "The diary key can't write to this diary. It needs Contents: read & write on " + REPO + ".";
-  const e = new Error(msg); e.status = res.status; return e;
-}
-
-async function loadIndex() {
-  if (LOCAL) {
-    const r = await fetch("entries.json?t=" + Date.now(), { cache: "no-store" });
-    return { entries: r.ok ? await r.json() : [], sha: null };
-  }
-  try {
-    const r = await fetch(API + INDEX + "?ref=" + BRANCH, { headers: headers(), cache: "no-store" });
-    if (r.status === 404) return { entries: [], sha: null };
-    if (!r.ok) throw await ghError(r);
-    const j = await r.json();
-    return { entries: JSON.parse(fromB64(j.content)), sha: j.sha };
-  } catch (e) {
-    // Rate-limited or offline API → fall back to the raw file (can lag a few minutes).
-    const r = await fetch(`https://raw.githubusercontent.com/${OWNER}/${REPO}/${BRANCH}/${INDEX}?t=${Date.now()}`);
-    if (!r.ok) throw e;
-    return { entries: await r.json(), sha: null };
-  }
-}
-
-async function putFile(path, b64, message, sha) {
-  const body = { message, content: b64, branch: BRANCH };
-  if (sha) body.sha = sha;
-  const r = await fetch(API + path, { method: "PUT", headers: headers(), body: JSON.stringify(body) });
-  if (!r.ok) throw await ghError(r);
-  return r.json();
-}
-
-async function deleteFile(path, sha, message) {
-  const r = await fetch(API + path, { method: "DELETE", headers: headers(), body: JSON.stringify({ message, sha, branch: BRANCH }) });
-  if (!r.ok) throw await ghError(r);
-}
-
-// Read-modify-write the index, retrying if the other person saved at the same moment.
-async function updateIndex(change, message) {
-  for (let attempt = 0; attempt < 4; attempt++) {
-    const r = await fetch(API + INDEX + "?ref=" + BRANCH, { headers: headers(), cache: "no-store" });
-    let list = [], sha;
-    if (r.ok) { const j = await r.json(); list = JSON.parse(fromB64(j.content)); sha = j.sha; }
-    else if (r.status !== 404) throw await ghError(r);
-    const next = change(list);
-    try {
-      await putFile(INDEX, toB64(JSON.stringify(next, null, 2) + "\n"), message, sha);
-      return next;
-    } catch (e) {
-      if (e.status !== 409 && e.status !== 422) throw e;
-    }
-  }
-  throw new Error("Couldn't save. Try again in a moment.");
-}
-
-function mediaUrl(path) {
-  if (LOCAL) return path.replace(/^diary\//, "");
-  return `https://raw.githubusercontent.com/${OWNER}/${REPO}/${BRANCH}/${path}`;
-}
-
 /* ---------- rendering ---------- */
 let entries = [];
 let filter = "all";
+let lastSeen = 0; // pages from the other person newer than this get a "new" ribbon
 const book = $("#book");
-
-function hash(str) { let h = 2166136261; for (const c of str) h = Math.imul(h ^ c.charCodeAt(0), 16777619); return h >>> 0; }
-function rand(seed, i) { return ((hash(seed + ":" + i) % 1000) / 1000); }
 
 const STICKER_SPOTS = [
   { top: "-16px", left: "-12px" }, { top: "-18px", right: "-10px" },
@@ -168,40 +37,59 @@ function fmtSpent(s) {
 }
 function fmtDur(s) { s = Math.round(s || 0); return `${Math.floor(s / 60)}:${String(s % 60).padStart(2, "0")}`; }
 
+function promptHtml(e) {
+  if (!e.prompt) return "";
+  const c = CATEGORIES[e.prompt.cat];
+  return `<div class="q"><small>${c ? `${c.emoji} ${esc(c.label)}` : "a question"}</small>${esc(e.prompt.q)}</div>`;
+}
+function guessHtml(e) {
+  if (!e.guess || e.together) return "";
+  return `<div class="guess"><small>${esc(e.author)}'s guess for ${esc(partnerOf(e.author))}</small>${esc(e.guess)}</div>`;
+}
+// Answers to a question stay blurred until you've answered it too.
+function isLocked(e) {
+  return !!(NAME && e.prompt && !e.together && e.author !== NAME && !answeredBy(entries, NAME, e.prompt.id));
+}
+
 function cardHtml(e) {
   const r = (rand(e.id, "r") * 6 - 3).toFixed(2);
   const del = KEY ? `<button class="del" data-del="${esc(e.id)}" aria-label="Remove this page">✕</button>` : "";
+  const isNew = NAME && e.at && new Date(e.at).getTime() > lastSeen && (e.by || e.author) !== NAME ? `<span class="new-ribbon">new</span>` : "";
+  const locked = isLocked(e);
+  const lock = locked ? `<button class="unlock" data-q="${esc(e.prompt.id)}">🔒 answer it too to see ${esc(e.author)}'s answer</button>` : "";
+  const cls = locked ? " locked" : "";
   const common = `data-id="${esc(e.id)}" style="--r:${r}deg"`;
+  const top = `${del}${isNew}${stickersHtml(e)}${promptHtml(e)}`;
   if (e.type === "note") {
     const paper = ["lined", "sticky", "pink", "kraft", "letter"].includes(e.paper) ? e.paper : "lined";
-    return `<article class="card note ${paper}" ${common}>${del}${paper === "sticky" || paper === "pink" ? "" : tapeHtml(e)}${stickersHtml(e)}
-      ${e.title ? `<h3>${esc(e.title)}</h3>` : ""}<p>${esc(e.text)}</p>${signHtml(e)}</article>`;
+    return `<article class="card note ${paper}${cls}" ${common}>${paper === "sticky" || paper === "pink" ? "" : tapeHtml(e)}${top}
+      <div class="body">${e.title ? `<h3>${esc(e.title)}</h3>` : ""}<p>${esc(e.text)}</p>${guessHtml(e)}</div>${lock}${signHtml(e)}</article>`;
   }
   if (e.type === "photo") {
     const frame = ["polaroid", "tape", "film", "heart", "stamp"].includes(e.frame) ? e.frame : "polaroid";
-    const cls = frame === "tape" ? "tape-frame" : frame;
-    return `<article class="card photo ${cls}" ${common}>${del}${frame === "tape" ? tapeHtml(e, 2) : ""}${stickersHtml(e)}
-      <div class="wrap"><img src="${esc(mediaUrl(e.media))}" alt="${esc(e.caption || "a picture of us")}" loading="lazy"></div>
-      ${e.caption ? `<div class="cap">${esc(e.caption)}</div>` : ""}${signHtml(e)}</article>`;
+    const fcls = frame === "tape" ? "tape-frame" : frame;
+    return `<article class="card photo ${fcls}${cls}" ${common}>${frame === "tape" ? tapeHtml(e, 2) : ""}${top}
+      <div class="body"><div class="wrap"><img src="${esc(mediaUrl(e.media))}" alt="${esc(e.caption || "a picture of us")}" loading="lazy"></div>
+      ${e.caption ? `<div class="cap">${esc(e.caption)}</div>` : ""}${guessHtml(e)}</div>${lock}${signHtml(e)}</article>`;
   }
   if (e.type === "voice") {
-    return `<article class="card voice" ${common}>${del}${stickersHtml(e)}
-      <div class="label-strip">${esc(e.title || "a little voice note")}</div>
+    return `<article class="card voice${cls}" ${common}>${top}
+      <div class="body"><div class="label-strip">${esc(e.title || "a little voice note")}</div>
       <div class="reels"><span class="spool"></span><button class="play" data-play="${esc(e.id)}" aria-label="Play">▶</button>
-        <div class="bar"><i></i></div><span class="dur">${fmtDur(e.duration)}</span><span class="spool"></span></div>
-      ${signHtml(e)}</article>`;
+        <div class="bar"><i></i></div><span class="dur">${fmtDur(e.duration)}</span><span class="spool"></span></div>${guessHtml(e)}</div>
+      ${lock}${signHtml(e)}</article>`;
   }
   return "";
 }
 
 function render() {
-  const list = entries.filter(e => filter === "all" || e.type === filter)
+  const list = entries.filter(e => filter === "all" || (filter === "answers" ? e.prompt : e.type === filter))
     .sort((a, b) => new Date(b.at) - new Date(a.at));
   $("#sub").textContent = entries.length
     ? `${entries.length} ${entries.length === 1 ? "page" : "pages"} of us so far`
     : "notes, pictures & voices, kept forever";
   if (!list.length) {
-    book.innerHTML = `<div class="empty"><b>${entries.length ? "Nothing here yet" : "The first page is waiting"}</b>${KEY ? "tap ＋ to stick something in" : "open your setup link to start writing"}</div>`;
+    book.innerHTML = `<div class="empty"><b>${entries.length ? "Nothing here yet" : "The first page is waiting"}</b>${KEY ? "tap ＋ to stick something in, or try the mini games for a question" : "open your setup link to start writing"}</div>`;
     return;
   }
   const days = new Map();
@@ -218,7 +106,12 @@ function render() {
 async function refresh() {
   try {
     entries = (await loadIndex()).entries;
+    lastSeen = Number(store.get("diary-seen-" + NAME)) || 0;
     render();
+    const fresh = $$(".new-ribbon").length;
+    if (fresh) setTimeout(() => window.goldiee?.say(`woof! ${fresh} new ${fresh === 1 ? "page" : "pages"} from ${partnerOf(NAME)} 💌`), 1200);
+    // Remember this visit a moment later, so the ribbons show this time but not next time.
+    if (NAME) setTimeout(() => store.set("diary-seen-" + NAME, String(Date.now())), 1500);
   } catch (e) {
     book.innerHTML = `<p class="empty">Couldn't open the diary right now.<br><small>${esc(e.message)}</small></p>`;
   }
@@ -247,6 +140,10 @@ function stopPlaying() {
 }
 
 book.addEventListener("click", async ev => {
+  const unlock = ev.target.closest(".unlock");
+  if (unlock) return startAnswer(questionById(unlock.dataset.q) || entries.find(x => x.prompt?.id === unlock.dataset.q)?.prompt);
+  if (ev.target.closest(".card.locked")) return;
+
   const play = ev.target.closest("[data-play]");
   if (play) {
     const id = play.dataset.play;
@@ -297,7 +194,13 @@ whoChoices.addEventListener("click", e => {
   const c = e.target.closest(".choice"); if (!c) return;
   pickedWho = c.dataset.v;
   $$(".choice", whoChoices).forEach(x => x.classList.toggle("on", x === c));
+  syncNotifyBlock();
 });
+function syncNotifyBlock() {
+  const topic = NOTIFY_TOPICS[pickedWho];
+  $("#notifyBlock").hidden = !topic;
+  if (topic) $("#notifyTopic").textContent = topic;
+}
 
 function openSettings(msg = "", err = false) {
   pickedWho = NAME;
@@ -306,6 +209,7 @@ function openSettings(msg = "", err = false) {
   $("#keyBlock").hidden = !!KEY;
   $("#pairBlock").hidden = !KEY;
   $("#forgetBtn").hidden = !KEY;
+  syncNotifyBlock();
   setStatus($("#settingsStatus"), msg, err);
   openSheet("#settingsBack");
 }
@@ -328,12 +232,16 @@ $("#settings").addEventListener("submit", async e => {
   setStatus(st, `All set, ${NAME} ♥`);
   syncFromLabel();
   render();
-  setTimeout(() => closeSheet($("#settingsBack")), 800);
+  setTimeout(() => { closeSheet($("#settingsBack")); if (pendingPrompt) startAnswer(pendingPrompt); }, 800);
 });
 $("#copyLinkBtn").addEventListener("click", async () => {
   const link = `${location.origin}${location.pathname}#pair=${encodeURIComponent(KEY)}`;
   try { await navigator.clipboard.writeText(link); setStatus($("#settingsStatus"), "Copied. Send it to the other phone (it's the key, so only to them)."); }
   catch { prompt("Copy this setup link:", link); }
+});
+$("#copyTopicBtn").addEventListener("click", async () => {
+  try { await navigator.clipboard.writeText($("#notifyTopic").textContent); toast("Copied. Paste it into the ntfy app"); }
+  catch { prompt("Copy this:", $("#notifyTopic").textContent); }
 });
 $("#forgetBtn").addEventListener("click", () => {
   if (!confirm("Lock this phone? It will need the setup link again to write.")) return;
@@ -344,18 +252,47 @@ $("#forgetBtn").addEventListener("click", () => {
 
 /* ---------- composer ---------- */
 const composer = $("#composer");
-const state = { type: "note", from: "me", paper: "lined", frame: "polaroid", stickers: [], photo: null, voice: null, voiceMime: "", duration: 0 };
+const state = { type: "note", from: "me", paper: "lined", frame: "polaroid", stickers: [], photo: null, voice: null, voiceMime: "", duration: 0, prompt: null };
 let openedAt = 0; // when this page was started, for "x min here"
+let pendingPrompt = null;
 
 function syncFromLabel() { $("#fromMe").textContent = NAME ? `just me (${NAME})` : "me"; }
 syncFromLabel();
 
-$("#fab").addEventListener("click", () => {
-  if (!KEY) return openSettings(`To write, open the setup link sent to you. Ask ${PEOPLE[0]} for it ♥`);
-  if (!NAME) return openSettings("First, tap whose phone this is.");
+function canWrite() {
+  if (!KEY) { openSettings(`To write, open the setup link sent to you. Ask ${PEOPLE[0]} for it ♥`); return false; }
+  if (!NAME) { openSettings("First, tap whose phone this is."); return false; }
+  return true;
+}
+function openComposer() {
   setStatus($("#status"), "");
   if (!openedAt) openedAt = Date.now();
+  const p = state.prompt;
+  $("#promptBanner").hidden = !p;
+  $("#guessBlock").hidden = !p;
+  $("#titleField").hidden = !!p;
+  if (p) {
+    const c = CATEGORIES[p.cat];
+    $("#promptBanner").innerHTML = `<small>${c ? `${c.emoji} ${esc(c.label)}` : "a question"}</small>${esc(p.q)}<button type="button" class="link-btn" id="dropPrompt">write something else</button>`;
+    $("#guessLabel").textContent = `and what do you think ${partnerOf(NAME)} would say? (optional)`;
+    $("#dropPrompt").onclick = () => { state.prompt = null; openComposer(); };
+  }
   openSheet("#composerBack");
+}
+// Opens the composer to answer a question (from the mini games or a locked card).
+function startAnswer(p) {
+  if (!p) return;
+  pendingPrompt = p;
+  if (!canWrite()) return;
+  pendingPrompt = null;
+  state.prompt = { id: p.id, cat: p.cat, q: p.q };
+  openComposer();
+}
+
+$("#fab").addEventListener("click", () => {
+  if (!canWrite()) return;
+  state.prompt = null;
+  openComposer();
 });
 
 $$(".tab", composer).forEach(t => t.addEventListener("click", () => {
@@ -443,7 +380,7 @@ function stopRecording() {
 
 function resetComposer() {
   composer.reset();
-  Object.assign(state, { stickers: [], photo: null, voice: null, voiceMime: "", duration: 0 });
+  Object.assign(state, { stickers: [], photo: null, voice: null, voiceMime: "", duration: 0, prompt: null });
   $$("#stickerPicker button").forEach(b => b.classList.remove("on"));
   $("#photoPreview").hidden = true; $("#dropText").hidden = false; $("#photoInput").value = "";
   recPreview.hidden = true; recTime.textContent = "tap to record";
@@ -458,15 +395,20 @@ composer.addEventListener("submit", async e => {
   const entry = {
     id, type: state.type,
     author: together ? PEOPLE.join(" & ") : NAME,
+    by: NAME,                                                         // whose phone wrote it
     together,
-    at: new Date().toISOString(),                                   // date + time, stamped automatically
+    at: new Date().toISOString(),                                     // date + time, stamped automatically
     spent: Math.round((Date.now() - (openedAt || Date.now())) / 1000), // how long was spent on this page
     stickers: [...state.stickers],
   };
+  if (state.prompt) {
+    entry.prompt = state.prompt;
+    if (!together && f.guess.value.trim()) entry.guess = f.guess.value.trim();
+  }
 
   if (state.type === "note") {
     if (!f.text.value.trim()) return setStatus(st, "Write something first ♥", true);
-    Object.assign(entry, { title: f.title.value.trim(), text: f.text.value.trim(), paper: state.paper });
+    Object.assign(entry, { title: state.prompt ? "" : f.title.value.trim(), text: f.text.value.trim(), paper: state.paper });
   } else if (state.type === "photo") {
     if (!state.photo) return setStatus(st, "Choose a picture first.", true);
     Object.assign(entry, { caption: f.caption.value.trim(), frame: state.frame });
@@ -475,6 +417,7 @@ composer.addEventListener("submit", async e => {
     Object.assign(entry, { title: f.voiceTitle.value.trim(), duration: Math.round(state.duration) });
   }
 
+  const kind = entry.prompt ? "answer" : state.type === "note" ? "note" : state.type === "photo" ? "picture" : "voice note";
   btn.disabled = true;
   try {
     const blob = state.type === "photo" ? state.photo : state.type === "voice" ? state.voice : null;
@@ -486,7 +429,11 @@ composer.addEventListener("submit", async e => {
       entry.mediaSha = res.content.sha;
     }
     setStatus(st, "Sticking it in…");
-    entries = await updateIndex(list => [entry, ...list], `A new ${state.type === "note" ? "note" : state.type === "photo" ? "picture" : "voice note"} from ${NAME}`);
+    entries = await updateIndex(list => [entry, ...list], `A new ${kind} from ${entry.author}`);
+    notifyPartner(
+      entry.prompt ? `${entry.author} answered a question 💭` : `${entry.author} added a new ${kind} 💌`,
+      entry.prompt ? `"${entry.prompt.q}" Answer it too to see theirs.` : "Open the diary to see it."
+    );
     render();
     resetComposer();
     openedAt = 0;
@@ -494,6 +441,7 @@ composer.addEventListener("submit", async e => {
     const r = $(`.card[data-id="${id}"]`)?.getBoundingClientRect();
     burst(r ? r.left + r.width / 2 : innerWidth / 2, r ? r.top + 40 : innerHeight / 2, 24);
     toast("Stuck in the diary ♥");
+    window.goldiee?.say(entry.prompt ? `ooh, an answer! I bet ${partnerOf(NAME)} can't wait to read it 🐾` : "yay! that one's going in my favourites 🐾", 5000);
   } catch (err) {
     setStatus(st, err.message, true);
   } finally {
@@ -501,49 +449,10 @@ composer.addEventListener("submit", async e => {
   }
 });
 
-function setStatus(el, msg, err = false) { el.textContent = msg; el.classList.toggle("err", err); }
-function toast(msg) {
-  const t = document.createElement("div");
-  t.className = "toast"; t.textContent = msg;
-  document.body.appendChild(t);
-  setTimeout(() => t.remove(), 2600);
-}
-
-/* ---------- heart cursor + trail (same feel as the first page) ---------- */
-const HEART = "M12 21s-7.5-4.6-9.6-9.2C.9 8.4 3 4.5 6.7 4.5c2.1 0 3.6 1.2 4.3 2.4h2c.7-1.2 2.2-2.4 4.3-2.4 3.7 0 5.8 3.9 4.3 7.3C19.5 16.4 12 21 12 21z";
-const COLORS = ["#d97b86", "#e8a0a8", "#6e2337", "#f3b6bd", "#c4566a"];
-const cursor = $("#cursor");
-let mx = innerWidth / 2, my = innerHeight / 2, cx = mx, cy = my, lx = mx, ly = my, live = 0;
-function spawnHeart(x, y, o = {}) {
-  if (reduceMotion || live > 60) return;
-  live++;
-  const s = o.size || 8 + Math.random() * 12;
-  const el = document.createElement("div");
-  el.className = "trail-heart"; el.style.width = el.style.height = s + "px";
-  el.innerHTML = `<svg viewBox="0 0 24 24"><path fill="${COLORS[Math.random() * COLORS.length | 0]}" d="${HEART}"/></svg>`;
-  document.body.appendChild(el);
-  const dx = o.vx ?? (Math.random() - .5) * 50, dy = o.vy ?? -(40 + Math.random() * 60);
-  el.animate([
-    { transform: `translate(${x - s / 2}px,${y - s / 2}px) scale(.2)`, opacity: 0 },
-    { transform: `translate(${x - s / 2 + dx * .2}px,${y - s / 2 + dy * .2}px) scale(1)`, opacity: .9, offset: .15 },
-    { transform: `translate(${x - s / 2 + dx}px,${y - s / 2 + dy}px) scale(.6) rotate(${(Math.random() - .5) * 60}deg)`, opacity: 0 },
-  ], { duration: o.life || 1100 + Math.random() * 600, easing: "cubic-bezier(.2,.6,.3,1)" }).onfinish = () => { el.remove(); live--; };
-}
-function burst(x, y, n = 14) {
-  for (let i = 0; i < n; i++) {
-    const a = (i / n) * Math.PI * 2, d = 70 + Math.random() * 100;
-    spawnHeart(x, y, { size: 12 + Math.random() * 14, vx: Math.cos(a) * d, vy: Math.sin(a) * d - 30, life: 1300 + Math.random() * 500 });
-  }
-}
-function trail(x, y) { if (Math.hypot(x - lx, y - ly) > 24) { spawnHeart(x, y); lx = x; ly = y; } }
-addEventListener("mousemove", e => { mx = e.clientX; my = e.clientY; trail(mx, my); }, { passive: true });
-addEventListener("touchmove", e => { const t = e.touches[0]; if (!e.target.closest(".sheet")) trail(t.clientX, t.clientY); }, { passive: true });
-document.addEventListener("mouseover", e => cursor.classList.toggle("big", !!e.target.closest("button, a, label, .photo img")));
-(function follow() {
-  cx += (mx - cx) * .22; cy += (my - cy) * .22;
-  cursor.style.transform = `translate3d(${cx}px,${cy}px,0)`;
-  requestAnimationFrame(follow);
-})();
-
-refresh();
-if (justPaired) openSettings(NAME ? `Unlocked ♥ Welcome back, ${NAME}.` : "Unlocked ♥ Now tap whose phone this is.");
+/* ---------- start ---------- */
+const askedQ = new URLSearchParams(location.search).get("q");
+if (askedQ) history.replaceState(null, "", location.pathname);
+refresh().then(() => {
+  if (justPaired) return openSettings(NAME ? `Unlocked ♥ Welcome back, ${NAME}.` : "Unlocked ♥ Now tap whose phone this is.");
+  if (askedQ) startAnswer(questionById(askedQ));
+});

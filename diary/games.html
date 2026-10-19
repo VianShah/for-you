@@ -1,0 +1,73 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Mini Games</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Caveat:wght@400;600&family=Cormorant+Garamond:ital,wght@0,400;0,500;1,400&family=Pinyon+Script&family=Jost:wght@300;400;500&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="diary.css">
+</head>
+<body class="games">
+
+<div class="cursor" id="cursor"><svg viewBox="0 0 24 24"><path fill="currentColor" d="M12 21s-7.5-4.6-9.6-9.2C.9 8.4 3 4.5 6.7 4.5c2.1 0 3.6 1.2 4.3 2.4h2c.7-1.2 2.2-2.4 4.3-2.4 3.7 0 5.8 3.9 4.3 7.3C19.5 16.4 12 21 12 21z"/></svg></div>
+
+<header class="top">
+  <a class="back" href="../">← back to the start</a>
+  <div class="title-wrap">
+    <div class="eyebrow">play · think · write</div>
+    <h1>Mini games</h1>
+    <p class="sub">little ways to know each other a bit more</p>
+  </div>
+  <nav class="sections">
+    <a class="section" href="./">📖 our diary</a>
+    <a class="section on" href="games.html">🎲 mini games</a>
+  </nav>
+</header>
+
+<main class="games-main">
+
+  <!-- TODAY'S QUESTION -->
+  <section class="game today" id="today">
+    <div class="game-head"><span class="game-icon">☀️</span><div><h2>Today's question</h2><p>The same question for both of you, every day.</p></div></div>
+    <div class="qcard" id="todayCard"></div>
+    <div class="who-answered" id="todayWho"></div>
+    <div class="game-actions" id="todayActions"></div>
+  </section>
+
+  <!-- QUESTION JAR -->
+  <section class="game jar-game">
+    <div class="game-head"><span class="game-icon">🫙</span><div><h2>The question jar</h2><p>Pick a theme, pull a question, then answer it in the diary or ask each other out loud.</p></div></div>
+    <div class="cats" id="cats"></div>
+    <div class="jar-stage">
+      <button class="jar" id="jar" aria-label="Pull a question">
+        <span class="jar-lid"></span>
+        <span class="jar-body"><span class="slips"><i></i><i></i><i></i><i></i><i></i><i></i></span></span>
+        <span class="jar-tap">tap to pull a question</span>
+      </button>
+      <div class="qcard pulled" id="jarCard" hidden></div>
+    </div>
+    <div class="game-actions" id="jarActions" hidden></div>
+  </section>
+
+  <!-- MEMORY LANE -->
+  <section class="game memory">
+    <div class="game-head"><span class="game-icon">🧠</span><div><h2>Memory lane</h2><p>A quick quiz made from your own diary. How well do you remember us?</p></div></div>
+    <div id="memory"></div>
+  </section>
+
+  <!-- PROGRESS -->
+  <section class="game progress-game">
+    <div class="game-head"><span class="game-icon">🌱</span><div><h2>How deep we've gone</h2><p>Questions you've <em>both</em> answered, by theme.</p></div></div>
+    <div class="progress-list" id="progress"></div>
+  </section>
+
+</main>
+
+<script src="core.js"></script>
+<script src="questions.js"></script>
+<script src="goldiee.js"></script>
+<script src="games.js"></script>
+</body>
+</html>

@@ -1,0 +1,195 @@
+/* ==========================================================
+   Shared by the diary and the mini games.
+   Every page is saved straight into the GitHub repo:
+     diary/entries.json  → list of all pages (text, styles, stickers)
+     diary/media/…       → pictures and voice notes
+   Writing needs the diary key (a fine-grained GitHub token that
+   only has "Contents: read & write" on this one repo). It's kept
+   in this browser only — never in the code.
+   ========================================================== */
+const PEOPLE = ["Vian", "Jovina"];
+const OWNER = "VianShah";
+const REPO = "for-you";
+const BRANCH = "main";
+const INDEX = "diary/entries.json";
+const MEDIA_DIR = "diary/media/";
+
+// Notifications go through ntfy.sh (free, no account). Each person installs the
+// ntfy app and subscribes to their own topic below. Only "X added a page" is sent,
+// never what the page says.
+const NOTIFY_TOPICS = { Vian: "for-you-vian-k7q2m9x4", Jovina: "for-you-jovina-r3w8p1z6" };
+
+// On a local preview, read from the files next to this page instead of GitHub.
+const LOCAL = ["localhost", "127.0.0.1"].includes(location.hostname);
+const reduceMotion = matchMedia("(prefers-reduced-motion: reduce)").matches;
+
+const $ = (s, el = document) => el.querySelector(s);
+const $$ = (s, el = document) => [...el.querySelectorAll(s)];
+const esc = s => String(s ?? "").replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+
+/* ---------- per-device settings (may be unavailable in private mode) ---------- */
+const store = {
+  get(k) { try { return localStorage.getItem(k) || ""; } catch { return ""; } },
+  set(k, v) { try { v ? localStorage.setItem(k, v) : localStorage.removeItem(k); } catch {} },
+};
+let KEY = store.get("diary-key");
+let NAME = PEOPLE.includes(store.get("diary-name")) ? store.get("diary-name") : "";
+const partnerOf = name => PEOPLE.find(p => p !== name) || PEOPLE[1];
+
+// One-tap setup: opening …/diary/#pair=<key> unlocks this phone, then the key
+// is wiped from the address bar so it isn't left in history or screenshots.
+let justPaired = false;
+if (location.hash.startsWith("#pair=")) {
+  KEY = decodeURIComponent(location.hash.slice(6)).trim();
+  store.set("diary-key", KEY);
+  history.replaceState(null, "", location.pathname + location.search);
+  justPaired = true;
+}
+
+/* ---------- GitHub helpers ---------- */
+const API = `https://api.github.com/repos/${OWNER}/${REPO}/contents/`;
+function headers() {
+  const h = { Accept: "application/vnd.github+json" };
+  if (KEY) h.Authorization = `Bearer ${KEY}`;
+  return h;
+}
+function toB64(str) {
+  const bytes = new TextEncoder().encode(str);
+  let bin = "";
+  for (let i = 0; i < bytes.length; i += 0x8000) bin += String.fromCharCode(...bytes.subarray(i, i + 0x8000));
+  return btoa(bin);
+}
+function fromB64(b64) {
+  const bin = atob(b64.replace(/\n/g, ""));
+  return new TextDecoder().decode(Uint8Array.from(bin, c => c.charCodeAt(0)));
+}
+function blobToB64(blob) {
+  return new Promise((res, rej) => {
+    const r = new FileReader();
+    r.onload = () => res(String(r.result).split(",")[1]);
+    r.onerror = rej;
+    r.readAsDataURL(blob);
+  });
+}
+async function ghError(res) {
+  let msg = `GitHub said ${res.status}`;
+  try { msg += ": " + (await res.json()).message; } catch {}
+  if (res.status === 401) msg = "The diary key isn't working. Check it in ⚙ settings.";
+  if (res.status === 403 || res.status === 404) msg = "The diary key can't write to this diary. It needs Contents: read & write on " + REPO + ".";
+  const e = new Error(msg); e.status = res.status; return e;
+}
+
+async function loadIndex() {
+  if (LOCAL) {
+    const r = await fetch("entries.json?t=" + Date.now(), { cache: "no-store" });
+    return { entries: r.ok ? await r.json() : [], sha: null };
+  }
+  try {
+    const r = await fetch(API + INDEX + "?ref=" + BRANCH, { headers: headers(), cache: "no-store" });
+    if (r.status === 404) return { entries: [], sha: null };
+    if (!r.ok) throw await ghError(r);
+    const j = await r.json();
+    return { entries: JSON.parse(fromB64(j.content)), sha: j.sha };
+  } catch (e) {
+    // Rate-limited or offline API → fall back to the raw file (can lag a few minutes).
+    const r = await fetch(`https://raw.githubusercontent.com/${OWNER}/${REPO}/${BRANCH}/${INDEX}?t=${Date.now()}`);
+    if (!r.ok) throw e;
+    return { entries: await r.json(), sha: null };
+  }
+}
+
+async function putFile(path, b64, message, sha) {
+  const body = { message, content: b64, branch: BRANCH };
+  if (sha) body.sha = sha;
+  const r = await fetch(API + path, { method: "PUT", headers: headers(), body: JSON.stringify(body) });
+  if (!r.ok) throw await ghError(r);
+  return r.json();
+}
+
+async function deleteFile(path, sha, message) {
+  const r = await fetch(API + path, { method: "DELETE", headers: headers(), body: JSON.stringify({ message, sha, branch: BRANCH }) });
+  if (!r.ok) throw await ghError(r);
+}
+
+// Read-modify-write the index, retrying if the other person saved at the same moment.
+async function updateIndex(change, message) {
+  for (let attempt = 0; attempt < 4; attempt++) {
+    const r = await fetch(API + INDEX + "?ref=" + BRANCH, { headers: headers(), cache: "no-store" });
+    let list = [], sha;
+    if (r.ok) { const j = await r.json(); list = JSON.parse(fromB64(j.content)); sha = j.sha; }
+    else if (r.status !== 404) throw await ghError(r);
+    const next = change(list);
+    try {
+      await putFile(INDEX, toB64(JSON.stringify(next, null, 2) + "\n"), message, sha);
+      return next;
+    } catch (e) {
+      if (e.status !== 409 && e.status !== 422) throw e;
+    }
+  }
+  throw new Error("Couldn't save. Try again in a moment.");
+}
+
+function mediaUrl(path) {
+  if (LOCAL) return path.replace(/^diary\//, "");
+  return `https://raw.githubusercontent.com/${OWNER}/${REPO}/${BRANCH}/${path}`;
+}
+
+/* ---------- notifications ---------- */
+// Pings the other person's phone. Never blocks or breaks a save.
+function notifyPartner(title, message) {
+  const to = NAME && NOTIFY_TOPICS[partnerOf(NAME)];
+  if (!to || LOCAL) return;
+  fetch("https://ntfy.sh/", {
+    method: "POST",
+    body: JSON.stringify({ topic: to, title, message, tags: ["love_letter"], click: new URL("./", location.href).href.replace(/games\.html$/, "") }),
+  }).catch(() => {});
+}
+
+/* ---------- small helpers ---------- */
+function hash(str) { let h = 2166136261; for (const c of String(str)) h = Math.imul(h ^ c.charCodeAt(0), 16777619); return h >>> 0; }
+function rand(seed, i) { return ((hash(seed + ":" + i) % 1000) / 1000); }
+function shuffle(a) { a = [...a]; for (let i = a.length - 1; i > 0; i--) { const j = Math.random() * (i + 1) | 0; [a[i], a[j]] = [a[j], a[i]]; } return a; }
+const answeredBy = (list, name, qid) => list.some(x => x.prompt?.id === qid && (x.together || x.author === name));
+function setStatus(el, msg, err = false) { el.textContent = msg; el.classList.toggle("err", err); }
+function toast(msg) {
+  const t = document.createElement("div");
+  t.className = "toast"; t.textContent = msg;
+  document.body.appendChild(t);
+  setTimeout(() => t.remove(), 2600);
+}
+
+/* ---------- heart cursor + trail (same feel as the first page) ---------- */
+const HEART = "M12 21s-7.5-4.6-9.6-9.2C.9 8.4 3 4.5 6.7 4.5c2.1 0 3.6 1.2 4.3 2.4h2c.7-1.2 2.2-2.4 4.3-2.4 3.7 0 5.8 3.9 4.3 7.3C19.5 16.4 12 21 12 21z";
+const COLORS = ["#d97b86", "#e8a0a8", "#6e2337", "#f3b6bd", "#c4566a"];
+const cursor = $("#cursor");
+let mx = innerWidth / 2, my = innerHeight / 2, cx = mx, cy = my, lx = mx, ly = my, live = 0;
+function spawnHeart(x, y, o = {}) {
+  if (reduceMotion || live > 60) return;
+  live++;
+  const s = o.size || 8 + Math.random() * 12;
+  const el = document.createElement("div");
+  el.className = "trail-heart"; el.style.width = el.style.height = s + "px";
+  el.innerHTML = `<svg viewBox="0 0 24 24"><path fill="${COLORS[Math.random() * COLORS.length | 0]}" d="${HEART}"/></svg>`;
+  document.body.appendChild(el);
+  const dx = o.vx ?? (Math.random() - .5) * 50, dy = o.vy ?? -(40 + Math.random() * 60);
+  el.animate([
+    { transform: `translate(${x - s / 2}px,${y - s / 2}px) scale(.2)`, opacity: 0 },
+    { transform: `translate(${x - s / 2 + dx * .2}px,${y - s / 2 + dy * .2}px) scale(1)`, opacity: .9, offset: .15 },
+    { transform: `translate(${x - s / 2 + dx}px,${y - s / 2 + dy}px) scale(.6) rotate(${(Math.random() - .5) * 60}deg)`, opacity: 0 },
+  ], { duration: o.life || 1100 + Math.random() * 600, easing: "cubic-bezier(.2,.6,.3,1)" }).onfinish = () => { el.remove(); live--; };
+}
+function burst(x, y, n = 14) {
+  for (let i = 0; i < n; i++) {
+    const a = (i / n) * Math.PI * 2, d = 70 + Math.random() * 100;
+    spawnHeart(x, y, { size: 12 + Math.random() * 14, vx: Math.cos(a) * d, vy: Math.sin(a) * d - 30, life: 1300 + Math.random() * 500 });
+  }
+}
+function trail(x, y) { if (Math.hypot(x - lx, y - ly) > 24) { spawnHeart(x, y); lx = x; ly = y; } }
+addEventListener("mousemove", e => { mx = e.clientX; my = e.clientY; trail(mx, my); }, { passive: true });
+addEventListener("touchmove", e => { const t = e.touches[0]; if (!e.target.closest(".sheet")) trail(t.clientX, t.clientY); }, { passive: true });
+document.addEventListener("mouseover", e => cursor.classList.toggle("big", !!e.target.closest("button, a, label, .photo img")));
+(function follow() {
+  cx += (mx - cx) * .22; cy += (my - cy) * .22;
+  cursor.style.transform = `translate3d(${cx}px,${cy}px,0)`;
+  requestAnimationFrame(follow);
+})();

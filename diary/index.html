@@ -21,11 +21,16 @@
     <h1>Our little diary</h1>
     <p class="sub" id="sub">notes, pictures &amp; voices, kept forever</p>
   </div>
+  <nav class="sections">
+    <a class="section on" href="./">📖 our diary</a>
+    <a class="section" href="games.html">🎲 mini games</a>
+  </nav>
   <nav class="filters" id="filters">
     <button class="chip on" data-f="all">everything</button>
     <button class="chip" data-f="note">✍️ notes</button>
     <button class="chip" data-f="photo">📷 pictures</button>
     <button class="chip" data-f="voice">🎙️ voices</button>
+    <button class="chip" data-f="answers">💭 answers</button>
   </nav>
 </header>
 
@@ -43,6 +48,8 @@
       <button type="button" class="icon-btn close" data-close>✕</button>
     </div>
 
+    <div class="prompt-banner" id="promptBanner" hidden></div>
+
     <div class="label">from</div>
     <div class="choices" data-choice="from">
       <button type="button" class="choice on" data-v="me" id="fromMe">me</button>
@@ -57,7 +64,7 @@
 
     <!-- note -->
     <section class="pane" data-pane="note">
-      <input class="field" name="title" placeholder="A title (optional)" maxlength="80">
+      <input class="field" name="title" id="titleField" placeholder="A title (optional)" maxlength="80">
       <textarea class="field hand" name="text" rows="6" placeholder="Dear you…"></textarea>
       <div class="label">paper</div>
       <div class="choices" data-choice="paper">
@@ -97,6 +104,11 @@
       <input class="field" name="voiceTitle" placeholder="What's this about?" maxlength="80">
     </section>
 
+    <div id="guessBlock" hidden>
+      <label class="label" id="guessLabel" for="guessField">and what do you think they would say?</label>
+      <textarea class="field hand" name="guess" id="guessField" rows="2" placeholder="my guess…"></textarea>
+    </div>
+
     <div class="label">stickers <small>(up to 4)</small></div>
     <div class="stickers" id="stickerPicker"></div>
 
@@ -128,6 +140,12 @@
       <button type="button" class="choice" id="copyLinkBtn">📋 copy the setup link</button>
     </div>
 
+    <div id="notifyBlock" hidden>
+      <div class="label">notifications</div>
+      <p class="help">To get a ping when the other one adds a page: install the free <b>ntfy</b> app (App Store / Play Store), tap ＋, and subscribe to this topic:</p>
+      <div class="topic-row"><code id="notifyTopic"></code><button type="button" class="choice" id="copyTopicBtn">copy</button></div>
+    </div>
+
     <div class="sheet-foot">
       <button type="button" class="link-btn" id="forgetBtn">lock this phone</button>
       <span class="status" id="settingsStatus"></span>
@@ -139,6 +157,9 @@
 <!-- ============ LIGHTBOX ============ -->
 <div class="lightbox" id="lightbox" hidden><img alt=""></div>
 
+<script src="core.js"></script>
+<script src="questions.js"></script>
+<script src="goldiee.js"></script>
 <script src="diary.js"></script>
 </body>
 </html>
