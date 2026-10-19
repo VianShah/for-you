@@ -290,6 +290,7 @@
 
 <footer>made with every bit of me</footer>
 
+<script src="diary/vault.js"></script>
 <script>
 /* ==========================================================
    EDIT HERE: your photos + captions.
@@ -319,14 +320,14 @@ const COLORS = ["#d97b86", "#e8a0a8", "#6e2337", "#f3b6bd", "#c4566a"];
 /* ---------- build gallery ---------- */
 const track = document.getElementById("track");
 const panelEnd = document.getElementById("panelEnd");
+const photoImgs = [];
 PHOTOS.forEach((p, i) => {
   const fig = document.createElement("figure");
   fig.className = "frame" + (p.wide ? " wide" : "");
   const img = new Image();
   img.alt = p.caption;
   img.loading = i < 2 ? "eager" : "lazy";
-  img.onerror = () => { img.onerror = null; img.src = `https://picsum.photos/seed/forher${i + 1}/900/1100`; };
-  img.src = p.src;
+  photoImgs.push([img, p, i]); // src is filled in by loadPhotos() below
   if (p.pos) img.style.objectPosition = p.pos;
   const box = document.createElement("div");
   box.className = "photo";
@@ -337,6 +338,22 @@ PHOTOS.forEach((p, i) => {
   track.insertBefore(fig, panelEnd);
 });
 const frames = [...track.querySelectorAll(".frame")];
+
+/* ---------- photos: plain, or encrypted behind our secret word ---------- */
+(async function loadPhotos() {
+  const vault = window.Vault && await Vault.fetchVault("diary/vault.json");
+  if (!vault) {
+    photoImgs.forEach(([img, p, i]) => {
+      img.onerror = () => { img.onerror = null; img.src = `https://picsum.photos/seed/forher${i + 1}/900/1100`; };
+      img.src = p.src;
+    });
+    return;
+  }
+  const key = await Vault.cached(vault) || await Vault.lockScreen(vault, { title: "Hey you.", hint: "Type our secret word to come in." });
+  photoImgs.forEach(([img, p]) => {
+    Vault.mediaUrl(key, p.src + ".enc", p.src).then(u => { img.src = u; }).catch(() => { img.alt = "couldn't open this photo"; });
+  });
+})();
 const gallery = document.getElementById("gallery");
 const count = document.getElementById("count");
 

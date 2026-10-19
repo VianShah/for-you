@@ -69,7 +69,7 @@ function cardHtml(e) {
     const frame = ["polaroid", "tape", "film", "heart", "stamp"].includes(e.frame) ? e.frame : "polaroid";
     const fcls = frame === "tape" ? "tape-frame" : frame;
     return `<article class="card photo ${fcls}${cls}" ${common}>${frame === "tape" ? tapeHtml(e, 2) : ""}${top}
-      <div class="body"><div class="wrap"><img src="${esc(mediaUrl(e.media))}" alt="${esc(e.caption || "a picture of us")}" loading="lazy"></div>
+      <div class="body"><div class="wrap"><img ${imgSrcAttrs(e.media)} alt="${esc(e.caption || "a picture of us")}" loading="lazy"></div>
       ${e.caption ? `<div class="cap">${esc(e.caption)}</div>` : ""}${guessHtml(e)}</div>${lock}${signHtml(e)}</article>`;
   }
   if (e.type === "voice") {
@@ -101,6 +101,7 @@ function render() {
   book.innerHTML = [...days].map(([d, es]) =>
     `<section class="day"><div class="day-label">${esc(d)}</div><div class="grid">${es.map(cardHtml).join("")}</div></section>`
   ).join("");
+  hydrateMedia(book);
 }
 
 async function refresh() {
@@ -163,9 +164,9 @@ book.addEventListener("click", async ev => {
     if (playingId === id) { player.pause(); stopPlaying(); return; }
     stopPlaying();
     const e = entries.find(x => x.id === id);
-    player.src = mediaUrl(e.media);
-    player.play().catch(() => toast("This voice note can't play on this device."));
     playingId = id;
+    try { player.src = await playableUrl(e.media); } catch { toast("Couldn't open this voice note."); return stopPlaying(); }
+    player.play().catch(() => toast("This voice note can't play on this device."));
     play.textContent = "❚❚";
     play.closest(".card").classList.add("playing");
     return;
@@ -219,9 +220,12 @@ function openSettings(msg = "", err = false) {
   pickedWho = NAME;
   $$(".choice", whoChoices).forEach(x => x.classList.toggle("on", x.dataset.v === NAME));
   $("#keyInput").value = "";
-  $("#keyBlock").hidden = !!KEY;
-  $("#pairBlock").hidden = !KEY;
-  $("#forgetBtn").hidden = !KEY;
+  const on = !!VAULT;
+  $("#keyBlock").hidden = on || !!KEY;
+  $("#pairBlock").hidden = on || !KEY;
+  $("#vaultSetupBlock").hidden = on || !KEY;
+  $("#vaultOnBlock").hidden = !on;
+  $("#forgetBtn").hidden = !on && !KEY;
   syncNotifyBlock();
   setStatus($("#settingsStatus"), msg, err);
   openSheet("#settingsBack");
@@ -257,10 +261,110 @@ $("#copyTopicBtn").addEventListener("click", async () => {
   catch { prompt("Copy this:", $("#notifyTopic").textContent); }
 });
 $("#forgetBtn").addEventListener("click", () => {
+  if (VAULT) {
+    if (!confirm("Lock this phone? You'll need the secret word to come back in.")) return;
+    Vault.forget(VAULT);
+    return location.reload();
+  }
   if (!confirm("Lock this phone? It will need the setup link again to write.")) return;
   KEY = ""; store.set("diary-key", "");
   openSettings("This phone is locked. It can still read the diary.");
   render();
+});
+
+/* ---------- switching the vault on (one time, from a phone that has the GitHub key) ---------- */
+const randomTag = () => Array.from(crypto.getRandomValues(new Uint8Array(6)), b => (b % 36).toString(36)).join("");
+async function shaOf(path) {
+  const r = await fetch(API + path + "?ref=" + BRANCH, { headers: headers(), cache: "no-store" });
+  return r.ok ? (await r.json()).sha : null;
+}
+async function switchOnVault(pass) {
+  const st = $("#settingsStatus");
+  const step = m => setStatus(st, m);
+  step("Making the lock… (a few seconds)");
+  const { key, vault } = await Vault.create(pass);
+  // Fresh notification topics, kept inside the vault so strangers can't subscribe.
+  const topics = Object.fromEntries(PEOPLE.map(p => [p, `for-you-${p.toLowerCase()}-${randomTag()}${randomTag()}`]));
+  vault.secrets = await Vault.encryptText(key, JSON.stringify({ token: KEY, topics }));
+  VAULT = vault; CRYPTO_KEY = key; // from here, packMedia/encodeIndex encrypt
+  try {
+    const ir = await fetch(API + INDEX + "?ref=" + BRANCH, { headers: headers(), cache: "no-store" });
+    if (!ir.ok && ir.status !== 404) throw await ghError(ir);
+    const ij = ir.ok ? await ir.json() : null;
+    const list = ij ? await decodeIndex(JSON.parse(fromB64(ij.content))) : [];
+    const toDelete = [];
+
+    // 1. diary pictures and voice notes
+    const withMedia = list.filter(e => e.media && !e.media.endsWith(".enc"));
+    for (const [i, e] of withMedia.entries()) {
+      step(`Encrypting diary file ${i + 1} of ${withMedia.length}…`);
+      const fr = await fetch(rawUrl(e.media) + "?t=" + Date.now());
+      if (!fr.ok) throw new Error("Couldn't read " + e.media);
+      const packed = await packMedia(e.media, await fr.blob());
+      const res = await putFile(packed.path, packed.b64, "Encrypt a diary file");
+      toDelete.push({ path: e.media, sha: e.mediaSha });
+      e.media = packed.path; e.mediaSha = res.content.sha;
+    }
+    // 2. the love-page photos
+    const pr = await fetch(API + "photos?ref=" + BRANCH, { headers: headers(), cache: "no-store" });
+    const photos = pr.ok ? (await pr.json()).filter(f => f.type === "file" && !f.name.endsWith(".enc") && Vault.mimeOf(f.name).startsWith("image/")) : [];
+    for (const [i, f] of photos.entries()) {
+      step(`Encrypting love-page photo ${i + 1} of ${photos.length}…`);
+      const fr = await fetch(f.download_url);
+      if (!fr.ok) throw new Error("Couldn't read " + f.path);
+      const packed = await packMedia(f.path, await fr.blob());
+      await putFile(packed.path, packed.b64, "Encrypt a love-page photo");
+      toDelete.push({ path: f.path, sha: f.sha });
+    }
+    // 3. the lock itself, then the encrypted diary
+    step("Locking the diary…");
+    await putFile("diary/vault.json", toB64(JSON.stringify(vault, null, 2) + "\n"), "Switch on the vault");
+    await putFile(INDEX, toB64(await encodeIndex(list)), "Encrypt the diary", ij?.sha);
+    // 4. remove the unencrypted originals
+    for (const [i, d] of toDelete.entries()) {
+      step(`Removing unencrypted copies ${i + 1} of ${toDelete.length}…`);
+      const sha = d.sha || await shaOf(d.path);
+      if (sha) await deleteFile(d.path, sha, "Remove an unencrypted copy").catch(() => {});
+    }
+    await Vault.remember(vault, key);
+    await applyVaultKey(key);
+    entries = list;
+  } catch (e) {
+    VAULT = null; CRYPTO_KEY = null;
+    throw e;
+  }
+}
+$("#vaultOnBtn").addEventListener("click", async () => {
+  const st = $("#settingsStatus");
+  const a = $("#passInput").value, b = $("#passInput2").value;
+  if (a.length < 8) return setStatus(st, "Make it at least 8 characters. A short sentence is best.", true);
+  if (a !== b) return setStatus(st, "The two don't match.", true);
+  if (!confirm("Encrypt everything now? Keep this tab open until it says done. Remember the secret word: it can't be recovered.")) return;
+  const btn = $("#vaultOnBtn"); btn.disabled = true;
+  try {
+    await switchOnVault(a);
+    $("#passInput").value = $("#passInput2").value = "";
+    render();
+    openSettings("Done. Everything is encrypted 🔐 On the other phone, open the diary and type the secret word.");
+  } catch (err) {
+    setStatus(st, "Stopped: " + err.message + " Nothing was lost, so you can try again.", true);
+  } finally { btn.disabled = false; }
+});
+$("#replaceKeyBtn").addEventListener("click", async () => {
+  const st = $("#settingsStatus");
+  const key = $("#newKeyInput").value.trim();
+  if (!key) return;
+  setStatus(st, "Checking the new key…");
+  try {
+    const r = await fetch(`https://api.github.com/repos/${OWNER}/${REPO}`, { headers: { Authorization: `Bearer ${key}`, Accept: "application/vnd.github+json" }, cache: "no-store" });
+    if (!r.ok) throw new Error("That key didn't work.");
+    KEY = key;
+    const next = { ...VAULT, secrets: await Vault.encryptText(CRYPTO_KEY, JSON.stringify({ token: key, topics: NOTIFY_TOPICS })) };
+    await putFile("diary/vault.json", toB64(JSON.stringify(next, null, 2) + "\n"), "Replace the GitHub key in the vault", await shaOf("diary/vault.json"));
+    VAULT = next;
+    $("#newKeyInput").value = "";
+    setStatus(st, "New key saved inside the vault ✓");
+  } catch (err) { setStatus(st, err.message, true); }
 });
 
 /* ---------- composer ---------- */
@@ -437,8 +541,9 @@ composer.addEventListener("submit", async e => {
     if (blob) {
       setStatus(st, state.type === "photo" ? "Uploading the picture…" : "Uploading the voice note…");
       const ext = state.type === "photo" ? "jpg" : ({ "audio/mp4": "m4a", "audio/ogg": "ogg" }[state.voiceMime] || "webm");
-      entry.media = `${MEDIA_DIR}${id}.${ext}`;
-      const res = await putFile(entry.media, await blobToB64(blob), `${state.type === "photo" ? "Picture" : "Voice note"} from ${NAME}`);
+      const packed = await packMedia(`${MEDIA_DIR}${id}.${ext}`, blob); // encrypted when the vault is on
+      entry.media = packed.path;
+      const res = await putFile(entry.media, packed.b64, `${state.type === "photo" ? "Picture" : "Voice note"} from ${NAME}`);
       entry.mediaSha = res.content.sha;
     }
     setStatus(st, "Sticking it in…");
@@ -468,7 +573,14 @@ composer.addEventListener("submit", async e => {
 /* ---------- start ---------- */
 const askedQ = new URLSearchParams(location.search).get("q");
 if (askedQ) history.replaceState(null, "", location.pathname);
-refresh().then(() => {
-  if (justPaired) return openSettings(NAME ? `Unlocked ♥ Welcome back, ${NAME}.` : "Unlocked ♥ Now tap whose phone this is.");
+(async () => {
+  // Once the vault is on, nothing is shown until the secret word is typed on this device.
+  if (await initVault() === "locked") {
+    book.innerHTML = "";
+    await applyVaultKey(await Vault.lockScreen(VAULT, { title: "Our little diary", hint: "Type our secret word to open it." }));
+  }
+  await refresh();
+  if (justPaired && !VAULT) return openSettings(NAME ? `Unlocked ♥ Welcome back, ${NAME}.` : "Unlocked ♥ Now tap whose phone this is.");
+  if (VAULT && !NAME) return openSettings("Welcome in ♥ Tap whose phone this is.");
   if (askedQ) startAnswer(questionById(askedQ));
-});
+})();

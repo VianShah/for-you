@@ -140,6 +140,23 @@
       <button type="button" class="choice" id="copyLinkBtn">📋 copy the setup link</button>
     </div>
 
+    <div id="vaultSetupBlock" hidden>
+      <div class="label">🔐 lock everything with a secret word</div>
+      <p class="help">Right now anyone can read the diary and see the photos. This encrypts every page, picture, voice note and love-page photo, so the repo only holds scrambled files.
+        After this, each phone just types the secret word. No more setup links. Pick something long only you two know, like a short sentence. <b>If you both forget it, nothing can be recovered.</b></p>
+      <input class="field" id="passInput" type="password" placeholder="secret word" autocomplete="new-password">
+      <input class="field" id="passInput2" type="password" placeholder="type it again" autocomplete="new-password">
+      <button type="button" class="choice" id="vaultOnBtn">🔐 encrypt everything now</button>
+    </div>
+
+    <div id="vaultOnBlock" hidden>
+      <p class="help">🔐 Everything is encrypted with your secret word. The other phone only needs the secret word to come in.</p>
+      <details class="replace-key"><summary>replace the GitHub key (when it expires)</summary>
+        <input class="field" id="newKeyInput" type="password" placeholder="new github_pat_…">
+        <button type="button" class="choice" id="replaceKeyBtn">save new key</button>
+      </details>
+    </div>
+
     <div id="notifyBlock" hidden>
       <div class="label">notifications</div>
       <p class="help">To get a ping when the other one adds a page: install the free <b>ntfy</b> app (App Store / Play Store), tap ＋, and subscribe to this topic:</p>
@@ -157,6 +174,7 @@
 <!-- ============ LIGHTBOX ============ -->
 <div class="lightbox" id="lightbox" hidden><img alt=""></div>
 
+<script src="vault.js"></script>
 <script src="core.js"></script>
 <script src="questions.js"></script>
 <script src="goldiee.js"></script>

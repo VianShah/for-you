@@ -15,9 +15,14 @@ const INDEX = "diary/entries.json";
 const MEDIA_DIR = "diary/media/";
 
 // Notifications go through ntfy.sh (free, no account). Each person installs the
-// ntfy app and subscribes to their own topic below. Only "X added a page" is sent,
-// never what the page says.
-const NOTIFY_TOPICS = { Vian: "for-you-vian-k7q2m9x4", Jovena: "for-you-jovena-r3w8p1z6" };
+// ntfy app and subscribes to their own topic. Only "X added a page" is sent,
+// never what the page says. Once the vault is on, the topics live encrypted
+// inside it (these public ones are only used before that).
+let NOTIFY_TOPICS = { Vian: "for-you-vian-k7q2m9x4", Jovena: "for-you-jovena-r3w8p1z6" };
+
+// The vault (see vault.js). null = not switched on yet, so files are plain.
+let VAULT = null;
+let CRYPTO_KEY = null;
 
 // On a local preview, read from the files next to this page instead of GitHub.
 const LOCAL = ["localhost", "127.0.0.1"].includes(location.hostname);
@@ -79,23 +84,59 @@ async function ghError(res) {
   const e = new Error(msg); e.status = res.status; return e;
 }
 
+/* ---------- vault ---------- */
+const rawUrl = path => LOCAL ? path.replace(/^diary\//, "") : `https://raw.githubusercontent.com/${OWNER}/${REPO}/${BRANCH}/${path}`;
+
+// Returns "plain" (vault not switched on), "locked" or "unlocked".
+async function initVault() {
+  VAULT = await Vault.fetchVault(rawUrl("diary/vault.json"));
+  if (!VAULT) return "plain";
+  const key = await Vault.cached(VAULT);
+  if (!key) return "locked";
+  await applyVaultKey(key);
+  return "unlocked";
+}
+async function applyVaultKey(key) {
+  CRYPTO_KEY = key;
+  if (VAULT.secrets) {
+    const s = JSON.parse(await Vault.decryptText(key, VAULT.secrets));
+    KEY = s.token || "";
+    if (s.topics) NOTIFY_TOPICS = s.topics;
+    store.set("diary-key", ""); // the key now lives only inside the vault
+  }
+}
+// entries.json is either a plain list or { v, enc } once the vault is on.
+async function decodeIndex(data) {
+  if (Array.isArray(data)) return data;
+  if (data && data.enc) {
+    if (!CRYPTO_KEY) throw new Error("The diary is locked.");
+    return JSON.parse(await Vault.decryptText(CRYPTO_KEY, data.enc));
+  }
+  return [];
+}
+async function encodeIndex(list) {
+  const text = JSON.stringify(list, null, 2);
+  return VAULT && CRYPTO_KEY ? JSON.stringify({ v: 1, enc: await Vault.encryptText(CRYPTO_KEY, text) }) + "\n" : text + "\n";
+}
+
 async function loadIndex() {
   if (LOCAL) {
     const r = await fetch("entries.json?t=" + Date.now(), { cache: "no-store" });
-    return { entries: r.ok ? await r.json() : [], sha: null };
+    return { entries: r.ok ? await decodeIndex(await r.json()) : [], sha: null };
   }
+  let data;
   try {
     const r = await fetch(API + INDEX + "?ref=" + BRANCH, { headers: headers(), cache: "no-store" });
     if (r.status === 404) return { entries: [], sha: null };
     if (!r.ok) throw await ghError(r);
-    const j = await r.json();
-    return { entries: JSON.parse(fromB64(j.content)), sha: j.sha };
+    data = JSON.parse(fromB64((await r.json()).content));
   } catch (e) {
     // Rate-limited or offline API → fall back to the raw file (can lag a few minutes).
-    const r = await fetch(`https://raw.githubusercontent.com/${OWNER}/${REPO}/${BRANCH}/${INDEX}?t=${Date.now()}`);
+    const r = await fetch(`${rawUrl(INDEX)}?t=${Date.now()}`);
     if (!r.ok) throw e;
-    return { entries: await r.json(), sha: null };
+    data = await r.json();
   }
+  return { entries: await decodeIndex(data), sha: null };
 }
 
 async function putFile(path, b64, message, sha) {
@@ -116,11 +157,11 @@ async function updateIndex(change, message) {
   for (let attempt = 0; attempt < 4; attempt++) {
     const r = await fetch(API + INDEX + "?ref=" + BRANCH, { headers: headers(), cache: "no-store" });
     let list = [], sha;
-    if (r.ok) { const j = await r.json(); list = JSON.parse(fromB64(j.content)); sha = j.sha; }
+    if (r.ok) { const j = await r.json(); list = await decodeIndex(JSON.parse(fromB64(j.content))); sha = j.sha; }
     else if (r.status !== 404) throw await ghError(r);
     const next = change(list);
     try {
-      await putFile(INDEX, toB64(JSON.stringify(next, null, 2) + "\n"), message, sha);
+      await putFile(INDEX, toB64(await encodeIndex(next)), message, sha);
       return next;
     } catch (e) {
       if (e.status !== 409 && e.status !== 422) throw e;
@@ -129,9 +170,29 @@ async function updateIndex(change, message) {
   throw new Error("Couldn't save. Try again in a moment.");
 }
 
-function mediaUrl(path) {
-  if (LOCAL) return path.replace(/^diary\//, "");
-  return `https://raw.githubusercontent.com/${OWNER}/${REPO}/${BRANCH}/${path}`;
+function mediaUrl(path) { return rawUrl(path); }
+const BLANK = "data:image/gif;base64,R0lGODlhAQABAAAAACH5BAEKAAEALAAAAAABAAEAAAICTAEAOw==";
+// <img> attributes: plain files load directly, encrypted ones are filled in by hydrateMedia().
+function imgSrcAttrs(path) {
+  return path.endsWith(".enc") ? `src="${BLANK}" data-enc="${esc(path)}"` : `src="${esc(mediaUrl(path))}"`;
+}
+function hydrateMedia(root = document) {
+  if (!CRYPTO_KEY) return;
+  $$("img[data-enc]", root).forEach(img => {
+    const path = img.dataset.enc;
+    img.removeAttribute("data-enc");
+    Vault.mediaUrl(CRYPTO_KEY, mediaUrl(path), path).then(u => { img.src = u; }).catch(() => { img.alt = "couldn't open this picture"; });
+  });
+}
+// A URL the <audio>/<img> can use right now (decrypting first if needed).
+async function playableUrl(path) {
+  return path.endsWith(".enc") ? Vault.mediaUrl(CRYPTO_KEY, mediaUrl(path), path) : mediaUrl(path);
+}
+// Encrypts a file's bytes when the vault is on; returns { path, b64 } ready to upload.
+async function packMedia(path, blob) {
+  if (!(VAULT && CRYPTO_KEY)) return { path, b64: await blobToB64(blob) };
+  const bytes = await Vault.encryptBytes(CRYPTO_KEY, new Uint8Array(await blob.arrayBuffer()));
+  return { path: path + ".enc", b64: Vault.b64(bytes) };
 }
 
 /* ---------- notifications ---------- */

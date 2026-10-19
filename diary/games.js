@@ -94,7 +94,7 @@ function buildQuiz() {
     // Which day was this?
     if (days.length >= 3) {
       const right = dayLabel(e.at);
-      const show = e.type === "photo" ? `<img class="quiz-img" src="${esc(mediaUrl(e.media))}" alt="">`
+      const show = e.type === "photo" ? `<img class="quiz-img" ${imgSrcAttrs(e.media)} alt="">`
         : `<blockquote>${esc(snippet(e.text || e.title || e.caption || "a voice note", 110))}</blockquote>`;
       pool.push({ id: e.id + "d", ask: "When was this added?", show,
         options: shuffle([right, ...shuffle(days.filter(d => d !== right)).slice(0, 2)]), answer: right });
@@ -122,12 +122,13 @@ function renderMemoryIntro() {
 function renderQuizStep() {
   const q = quiz[qi];
   const opts = q.options.map(o => {
-    if (q.pics) { const p = entries.find(x => x.id === o); return `<button class="opt pic" data-o="${esc(o)}"><img src="${esc(mediaUrl(p.media))}" alt=""></button>`; }
+    if (q.pics) { const p = entries.find(x => x.id === o); return `<button class="opt pic" data-o="${esc(o)}"><img ${imgSrcAttrs(p.media)} alt=""></button>`; }
     return `<button class="opt" data-o="${esc(o)}">${esc(o)}</button>`;
   }).join("");
   $("#memory").innerHTML = `<div class="quiz">
     <div class="quiz-top"><span>question ${qi + 1} of ${quiz.length}</span><span>score ${score}</span></div>
     <h3>${esc(q.ask)}</h3>${q.show}<div class="opts${q.pics ? " pics" : ""}">${opts}</div></div>`;
+  hydrateMedia($("#memory"));
 }
 document.addEventListener("click", e => {
   if (e.target.closest("#startQuiz")) { quiz = buildQuiz(); qi = 0; score = 0; return renderQuizStep(); }
@@ -173,6 +174,10 @@ function renderProgress() {
 }
 
 (async () => {
+  // Same lock as the diary: nothing loads until the secret word is typed on this device.
+  if (await initVault() === "locked") {
+    await applyVaultKey(await Vault.lockScreen(VAULT, { title: "Mini games", hint: "Type our secret word to play." }));
+  }
   try { entries = (await loadIndex()).entries; } catch { entries = []; }
   renderToday();
   setTimeout(goldieeNudge, 1500);
