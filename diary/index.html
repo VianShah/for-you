@@ -43,6 +43,12 @@
       <button type="button" class="icon-btn close" data-close>✕</button>
     </div>
 
+    <div class="label">from</div>
+    <div class="choices" data-choice="from">
+      <button type="button" class="choice on" data-v="me" id="fromMe">me</button>
+      <button type="button" class="choice" data-v="together">us, together ♥</button>
+    </div>
+
     <div class="tabs" role="tablist">
       <button type="button" class="tab on" data-type="note">✍️ Note</button>
       <button type="button" class="tab" data-type="photo">📷 Picture</button>
@@ -105,16 +111,25 @@
 <div class="sheet-back" id="settingsBack" hidden>
   <form class="sheet small" id="settings" autocomplete="off">
     <div class="sheet-head">
-      <h2>Your key to the diary</h2>
+      <h2>This phone</h2>
       <button type="button" class="icon-btn close" data-close>✕</button>
     </div>
-    <p class="help">Anyone can read the diary. To add pages, enter your name and the diary key once on this device and it will be remembered here.</p>
-    <label class="label" for="nameInput">who's writing?</label>
-    <input class="field" id="nameInput" placeholder="your name" maxlength="30">
-    <label class="label" for="keyInput">diary key</label>
-    <input class="field" id="keyInput" type="password" placeholder="github_pat_…">
+    <div class="label">whose phone is this?</div>
+    <div class="choices" id="whoChoices"></div>
+
+    <div id="keyBlock">
+      <p class="help">The diary needs to be unlocked once on each phone. Open the setup link you were sent, or paste the diary key here.</p>
+      <label class="label" for="keyInput">diary key</label>
+      <input class="field" id="keyInput" type="password" placeholder="github_pat_…">
+    </div>
+
+    <div id="pairBlock" hidden>
+      <p class="help">✓ This phone can write in the diary.<br>To set up the other phone, send this link. Opening it once unlocks the diary there, with nothing to type.</p>
+      <button type="button" class="choice" id="copyLinkBtn">📋 copy the setup link</button>
+    </div>
+
     <div class="sheet-foot">
-      <button type="button" class="link-btn" id="forgetBtn">forget on this device</button>
+      <button type="button" class="link-btn" id="forgetBtn">lock this phone</button>
       <span class="status" id="settingsStatus"></span>
       <button type="submit" class="save">Save</button>
     </div>

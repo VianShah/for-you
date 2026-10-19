@@ -7,6 +7,8 @@
    only has "Contents: read & write" on this one repo). It's kept
    in this browser only — never in the code.
    ========================================================== */
+// The two people who write in this diary — change the second name to hers.
+const PEOPLE = ["Vian", "Wifeyyyy"];
 const OWNER = "VianShah";
 const REPO = "for-you";
 const BRANCH = "main";
@@ -30,7 +32,17 @@ const store = {
   set(k, v) { try { v ? localStorage.setItem(k, v) : localStorage.removeItem(k); } catch {} },
 };
 let KEY = store.get("diary-key");
-let NAME = store.get("diary-name");
+let NAME = PEOPLE.includes(store.get("diary-name")) ? store.get("diary-name") : "";
+
+// One-tap setup: opening …/diary/#pair=<key> unlocks this phone, then the key
+// is wiped from the address bar so it isn't left in history or screenshots.
+let justPaired = false;
+if (location.hash.startsWith("#pair=")) {
+  KEY = decodeURIComponent(location.hash.slice(6)).trim();
+  store.set("diary-key", KEY);
+  history.replaceState(null, "", location.pathname + location.search);
+  justPaired = true;
+}
 
 /* ---------- GitHub helpers ---------- */
 const API = `https://api.github.com/repos/${OWNER}/${REPO}/contents/`;
@@ -144,8 +156,15 @@ function tapeHtml(e, n = 1) {
   return Array.from({ length: n }, (_, i) => `<span class="tape" style="--tc:${TAPE_COLORS[(hash(e.id) + i) % TAPE_COLORS.length]}"></span>`).join("");
 }
 function signHtml(e) {
-  const t = new Date(e.at).toLocaleTimeString([], { hour: "numeric", minute: "2-digit" }).toLowerCase();
-  return `<div class="sign"><b>— ${esc(e.author || "us")}</b><span>${t}</span></div>`;
+  const t = new Date(e.at).toLocaleString("en-GB", { day: "numeric", month: "short", hour: "numeric", minute: "2-digit", hour12: true }).toLowerCase();
+  const spent = e.spent ? ` · ${fmtSpent(e.spent)} here` : "";
+  return `<div class="sign"><b>— ${esc(e.author || "us")}</b><span>${t}${spent}</span></div>`;
+}
+function fmtSpent(s) {
+  if (s < 60) return "under a minute";
+  const m = Math.round(s / 60);
+  if (m < 60) return `${m} min`;
+  return `${Math.floor(m / 60)} h ${m % 60} min`;
 }
 function fmtDur(s) { s = Math.round(s || 0); return `${Math.floor(s / 60)}:${String(s % 60).padStart(2, "0")}`; }
 
@@ -182,7 +201,7 @@ function render() {
     ? `${entries.length} ${entries.length === 1 ? "page" : "pages"} of us so far`
     : "notes, pictures & voices, kept forever";
   if (!list.length) {
-    book.innerHTML = `<div class="empty"><b>${entries.length ? "Nothing here yet" : "The first page is waiting"}</b>${KEY ? "tap ＋ to stick something in" : "add your diary key in ⚙ to start writing"}</div>`;
+    book.innerHTML = `<div class="empty"><b>${entries.length ? "Nothing here yet" : "The first page is waiting"}</b>${KEY ? "tap ＋ to stick something in" : "open your setup link to start writing"}</div>`;
     return;
   }
   const days = new Map();
@@ -271,44 +290,71 @@ addEventListener("keydown", e => {
 });
 
 /* ---------- settings ---------- */
-function openSettings(msg = "") {
-  $("#nameInput").value = NAME;
-  $("#keyInput").value = KEY;
-  setStatus($("#settingsStatus"), msg, !!msg);
+const whoChoices = $("#whoChoices");
+let pickedWho = NAME;
+whoChoices.innerHTML = PEOPLE.map(p => `<button type="button" class="choice" data-v="${esc(p)}">${esc(p)}</button>`).join("");
+whoChoices.addEventListener("click", e => {
+  const c = e.target.closest(".choice"); if (!c) return;
+  pickedWho = c.dataset.v;
+  $$(".choice", whoChoices).forEach(x => x.classList.toggle("on", x === c));
+});
+
+function openSettings(msg = "", err = false) {
+  pickedWho = NAME;
+  $$(".choice", whoChoices).forEach(x => x.classList.toggle("on", x.dataset.v === NAME));
+  $("#keyInput").value = "";
+  $("#keyBlock").hidden = !!KEY;
+  $("#pairBlock").hidden = !KEY;
+  $("#forgetBtn").hidden = !KEY;
+  setStatus($("#settingsStatus"), msg, err);
   openSheet("#settingsBack");
 }
 $("#settingsBtn").addEventListener("click", () => openSettings());
 $("#settings").addEventListener("submit", async e => {
   e.preventDefault();
-  const name = $("#nameInput").value.trim();
-  const key = $("#keyInput").value.trim();
   const st = $("#settingsStatus");
-  if (!name || !key) return setStatus(st, "Both your name and the key, please.", true);
-  setStatus(st, "Checking the key…");
-  try {
-    const r = await fetch(`https://api.github.com/repos/${OWNER}/${REPO}`, { headers: { Authorization: `Bearer ${key}`, Accept: "application/vnd.github+json" }, cache: "no-store" });
-    if (!r.ok) throw new Error("That key didn't work.");
-  } catch (err) { return setStatus(st, err.message, true); }
-  KEY = key; NAME = name;
-  store.set("diary-key", key); store.set("diary-name", name);
-  setStatus(st, "Saved on this device ♥");
+  if (!pickedWho) return setStatus(st, "Tap whose phone this is.", true);
+  const key = $("#keyInput").value.trim();
+  if (!KEY && !key) return setStatus(st, "Open your setup link, or paste the diary key.", true);
+  if (key) {
+    setStatus(st, "Checking the key…");
+    try {
+      const r = await fetch(`https://api.github.com/repos/${OWNER}/${REPO}`, { headers: { Authorization: `Bearer ${key}`, Accept: "application/vnd.github+json" }, cache: "no-store" });
+      if (!r.ok) throw new Error("That key didn't work.");
+    } catch (err) { return setStatus(st, err.message, true); }
+    KEY = key; store.set("diary-key", key);
+  }
+  NAME = pickedWho; store.set("diary-name", NAME);
+  setStatus(st, `All set, ${NAME} ♥`);
+  syncFromLabel();
   render();
-  setTimeout(() => closeSheet($("#settingsBack")), 700);
+  setTimeout(() => closeSheet($("#settingsBack")), 800);
+});
+$("#copyLinkBtn").addEventListener("click", async () => {
+  const link = `${location.origin}${location.pathname}#pair=${encodeURIComponent(KEY)}`;
+  try { await navigator.clipboard.writeText(link); setStatus($("#settingsStatus"), "Copied. Send it to the other phone (it's the key, so only to them)."); }
+  catch { prompt("Copy this setup link:", link); }
 });
 $("#forgetBtn").addEventListener("click", () => {
+  if (!confirm("Lock this phone? It will need the setup link again to write.")) return;
   KEY = ""; store.set("diary-key", "");
-  $("#keyInput").value = "";
-  setStatus($("#settingsStatus"), "Key removed from this device.");
+  openSettings("This phone is locked. It can still read the diary.");
   render();
 });
 
 /* ---------- composer ---------- */
 const composer = $("#composer");
-const state = { type: "note", paper: "lined", frame: "polaroid", stickers: [], photo: null, voice: null, voiceMime: "", duration: 0 };
+const state = { type: "note", from: "me", paper: "lined", frame: "polaroid", stickers: [], photo: null, voice: null, voiceMime: "", duration: 0 };
+let openedAt = 0; // when this page was started, for "x min here"
+
+function syncFromLabel() { $("#fromMe").textContent = NAME ? `just me (${NAME})` : "me"; }
+syncFromLabel();
 
 $("#fab").addEventListener("click", () => {
-  if (!KEY || !NAME) return openSettings("Add your name and the diary key first.");
+  if (!KEY) return openSettings(`To write, open the setup link sent to you. Ask ${PEOPLE[0]} for it ♥`);
+  if (!NAME) return openSettings("First, tap whose phone this is.");
   setStatus($("#status"), "");
+  if (!openedAt) openedAt = Date.now();
   openSheet("#composerBack");
 });
 
@@ -408,7 +454,15 @@ composer.addEventListener("submit", async e => {
   const st = $("#status"), btn = $("#saveBtn");
   const f = composer.elements;
   const id = Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
-  const entry = { id, type: state.type, author: NAME, at: new Date().toISOString(), stickers: [...state.stickers] };
+  const together = state.from === "together";
+  const entry = {
+    id, type: state.type,
+    author: together ? PEOPLE.join(" & ") : NAME,
+    together,
+    at: new Date().toISOString(),                                   // date + time, stamped automatically
+    spent: Math.round((Date.now() - (openedAt || Date.now())) / 1000), // how long was spent on this page
+    stickers: [...state.stickers],
+  };
 
   if (state.type === "note") {
     if (!f.text.value.trim()) return setStatus(st, "Write something first ♥", true);
@@ -435,6 +489,7 @@ composer.addEventListener("submit", async e => {
     entries = await updateIndex(list => [entry, ...list], `A new ${state.type === "note" ? "note" : state.type === "photo" ? "picture" : "voice note"} from ${NAME}`);
     render();
     resetComposer();
+    openedAt = 0;
     closeSheet($("#composerBack"));
     const r = $(`.card[data-id="${id}"]`)?.getBoundingClientRect();
     burst(r ? r.left + r.width / 2 : innerWidth / 2, r ? r.top + 40 : innerHeight / 2, 24);
@@ -491,3 +546,4 @@ document.addEventListener("mouseover", e => cursor.classList.toggle("big", !!e.t
 })();
 
 refresh();
+if (justPaired) openSettings(NAME ? `Unlocked ♥ Welcome back, ${NAME}.` : "Unlocked ♥ Now tap whose phone this is.");
