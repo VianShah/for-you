@@ -1,0 +1,129 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Our Diary</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Caveat:wght@400;600&family=Cormorant+Garamond:ital,wght@0,400;0,500;1,400&family=Pinyon+Script&family=Jost:wght@300;400;500&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="diary.css">
+</head>
+<body>
+
+<div class="cursor" id="cursor"><svg viewBox="0 0 24 24"><path fill="currentColor" d="M12 21s-7.5-4.6-9.6-9.2C.9 8.4 3 4.5 6.7 4.5c2.1 0 3.6 1.2 4.3 2.4h2c.7-1.2 2.2-2.4 4.3-2.4 3.7 0 5.8 3.9 4.3 7.3C19.5 16.4 12 21 12 21z"/></svg></div>
+
+<header class="top">
+  <a class="back" href="../">← back to the start</a>
+  <button class="icon-btn" id="settingsBtn" aria-label="Settings">⚙</button>
+  <div class="title-wrap">
+    <div class="eyebrow">a scrapbook of us</div>
+    <h1>Our little diary</h1>
+    <p class="sub" id="sub">notes, pictures &amp; voices, kept forever</p>
+  </div>
+  <nav class="filters" id="filters">
+    <button class="chip on" data-f="all">everything</button>
+    <button class="chip" data-f="note">✍️ notes</button>
+    <button class="chip" data-f="photo">📷 pictures</button>
+    <button class="chip" data-f="voice">🎙️ voices</button>
+  </nav>
+</header>
+
+<main id="book">
+  <p class="loading">opening the diary…</p>
+</main>
+
+<button class="fab" id="fab" aria-label="Add a page">＋</button>
+
+<!-- ============ COMPOSER ============ -->
+<div class="sheet-back" id="composerBack" hidden>
+  <form class="sheet" id="composer" autocomplete="off">
+    <div class="sheet-head">
+      <h2>A new page</h2>
+      <button type="button" class="icon-btn close" data-close>✕</button>
+    </div>
+
+    <div class="tabs" role="tablist">
+      <button type="button" class="tab on" data-type="note">✍️ Note</button>
+      <button type="button" class="tab" data-type="photo">📷 Picture</button>
+      <button type="button" class="tab" data-type="voice">🎙️ Voice</button>
+    </div>
+
+    <!-- note -->
+    <section class="pane" data-pane="note">
+      <input class="field" name="title" placeholder="A title (optional)" maxlength="80">
+      <textarea class="field hand" name="text" rows="6" placeholder="Dear you…"></textarea>
+      <div class="label">paper</div>
+      <div class="choices" data-choice="paper">
+        <button type="button" class="choice on" data-v="lined">lined</button>
+        <button type="button" class="choice" data-v="sticky">sticky note</button>
+        <button type="button" class="choice" data-v="pink">pink sticky</button>
+        <button type="button" class="choice" data-v="kraft">kraft</button>
+        <button type="button" class="choice" data-v="letter">letter</button>
+      </div>
+    </section>
+
+    <!-- photo -->
+    <section class="pane" data-pane="photo" hidden>
+      <label class="drop" id="drop">
+        <input type="file" accept="image/*" id="photoInput" hidden>
+        <span id="dropText">tap to choose a picture</span>
+        <img id="photoPreview" alt="" hidden>
+      </label>
+      <input class="field" name="caption" placeholder="A caption" maxlength="120">
+      <div class="label">frame</div>
+      <div class="choices" data-choice="frame">
+        <button type="button" class="choice on" data-v="polaroid">polaroid</button>
+        <button type="button" class="choice" data-v="tape">taped</button>
+        <button type="button" class="choice" data-v="film">film</button>
+        <button type="button" class="choice" data-v="heart">heart</button>
+        <button type="button" class="choice" data-v="stamp">stamp</button>
+      </div>
+    </section>
+
+    <!-- voice -->
+    <section class="pane" data-pane="voice" hidden>
+      <div class="recorder">
+        <button type="button" class="rec-btn" id="recBtn" aria-label="Record"><span></span></button>
+        <div class="rec-time" id="recTime">tap to record</div>
+        <audio id="recPreview" controls hidden></audio>
+      </div>
+      <input class="field" name="voiceTitle" placeholder="What's this about?" maxlength="80">
+    </section>
+
+    <div class="label">stickers <small>(up to 4)</small></div>
+    <div class="stickers" id="stickerPicker"></div>
+
+    <div class="sheet-foot">
+      <span class="status" id="status"></span>
+      <button type="submit" class="save" id="saveBtn">Stick it in ♥</button>
+    </div>
+  </form>
+</div>
+
+<!-- ============ SETTINGS ============ -->
+<div class="sheet-back" id="settingsBack" hidden>
+  <form class="sheet small" id="settings" autocomplete="off">
+    <div class="sheet-head">
+      <h2>Your key to the diary</h2>
+      <button type="button" class="icon-btn close" data-close>✕</button>
+    </div>
+    <p class="help">Anyone can read the diary. To add pages, enter your name and the diary key once on this device and it will be remembered here.</p>
+    <label class="label" for="nameInput">who's writing?</label>
+    <input class="field" id="nameInput" placeholder="your name" maxlength="30">
+    <label class="label" for="keyInput">diary key</label>
+    <input class="field" id="keyInput" type="password" placeholder="github_pat_…">
+    <div class="sheet-foot">
+      <button type="button" class="link-btn" id="forgetBtn">forget on this device</button>
+      <span class="status" id="settingsStatus"></span>
+      <button type="submit" class="save">Save</button>
+    </div>
+  </form>
+</div>
+
+<!-- ============ LIGHTBOX ============ -->
+<div class="lightbox" id="lightbox" hidden><img alt=""></div>
+
+<script src="diary.js"></script>
+</body>
+</html>

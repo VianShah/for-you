@@ -162,6 +162,10 @@
   .tap { margin-top: 36px; font-size: 12px; letter-spacing: .35em; text-transform: uppercase; color: var(--muted); transition: opacity .4s; }
   .envelope.open + .tap { opacity: 0; }
   .letter { padding-top: 200px; }
+  .diary-link { display: block; margin-top: -10px; text-decoration: none; text-align: center; font-family: var(--serif); font-style: italic; font-size: 20px; color: var(--ink);
+    opacity: 0; transform: translateY(16px); pointer-events: none; transition: opacity .8s 1.4s, transform .8s 1.4s; }
+  .diary-link span { display: table; margin: 14px auto 0; padding: 13px 24px; border-radius: 999px; background: var(--wine); color: var(--cream);
+    font-family: var(--sans); font-style: normal; font-size: 14px; letter-spacing: .08em; }  .envelope.open ~ .diary-link { opacity: 1; transform: none; pointer-events: auto; }
 
   footer { text-align: center; padding: 40px 16px; font-size: 12px; letter-spacing: .3em; color: var(--muted); background: var(--blush); }
 
@@ -267,6 +271,7 @@
     <div class="seal">♥</div>
   </button>
   <div class="tap">tap to open</div>
+  <a class="diary-link" href="diary/">and this is ours to fill <span>open our diary →</span></a>
 </section>
 
 <footer>made with every bit of me</footer>
