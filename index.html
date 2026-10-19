@@ -41,6 +41,15 @@
   .progress { position: fixed; top: 0; left: 0; height: 2px; width: 100%; z-index: 50;
     background: linear-gradient(90deg, var(--rose), var(--wine)); transform-origin: 0 50%; transform: scaleX(0); }
 
+  /* ---------- skip straight to the diary / games ---------- */
+  .skip { position: fixed; top: max(12px, env(safe-area-inset-top)); right: 12px; z-index: 60; display: flex; align-items: center; gap: 4px;
+    padding: 4px 4px 4px 12px; border-radius: 999px; background: rgba(251,245,239,.82); backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px);
+    box-shadow: 0 6px 18px -8px rgba(110,35,55,.35); font-size: 12px; opacity: 0; animation: rise .8s 1.8s forwards; }
+  .skip span { color: var(--muted); letter-spacing: .15em; text-transform: uppercase; font-size: 10px; margin-right: 4px; }
+  .skip a { color: var(--wine); text-decoration: none; padding: 7px 12px; border-radius: 999px; white-space: nowrap; transition: background .2s; }
+  .skip a:hover { background: var(--blush); }
+  @media (max-width: 420px) { .skip span { display: none; } .skip { padding-left: 4px; } .skip a { padding: 7px 10px; } }
+
   /* ---------- intro ---------- */
   .intro {
     min-height: 100svh; display: grid; place-items: center; text-align: center; padding: 24px 16px;
@@ -187,7 +196,7 @@
   }
   @media (prefers-reduced-motion: reduce) {
     *, *::before, *::after { animation: none !important; transition: none !important; }
-    .intro .fade, .scroll-hint { opacity: 1; transform: none; }
+    .intro .fade, .scroll-hint, .skip { opacity: 1; transform: none; }
     .reveal { opacity: 1; transform: none; }
   }
 </style>
@@ -195,6 +204,11 @@
 <body>
 
 <div class="progress" id="progress"></div>
+<nav class="skip" aria-label="Skip ahead">
+  <span>skip to</span>
+  <a href="diary/">📖 our diary</a>
+  <a href="diary/games.html">🎲 mini games</a>
+</nav>
 <div class="cursor" id="cursor"><svg viewBox="0 0 24 24"><path fill="currentColor" d="M12 21s-7.5-4.6-9.6-9.2C.9 8.4 3 4.5 6.7 4.5c2.1 0 3.6 1.2 4.3 2.4h2c.7-1.2 2.2-2.4 4.3-2.4 3.7 0 5.8 3.9 4.3 7.3C19.5 16.4 12 21 12 21z"/></svg></div>
 
 <!-- ============ INTRO ============ -->
