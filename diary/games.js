@@ -144,12 +144,24 @@ document.addEventListener("click", e => {
       const best = Math.max(score, Number(store.get("memory-best")) || 0);
       store.set("memory-best", String(best));
       const line = score === quiz.length ? "Perfect. You really were paying attention ♥" : score >= quiz.length - 2 ? "So close. You know us well." : "Time to reread the diary together 😄";
-      window.goldiee?.say(score === quiz.length ? "PERFECT! *zoomies* 🐾" : "good try! wanna play again?", 4000);
       $("#memory").innerHTML = `<div class="memory-intro"><div class="big-score">${score}/${quiz.length}</div><p>${line}</p>
         <button class="save" id="startQuiz">play again ↻</button> <a class="ghost" href="./">write about a memory →</a></div>`;
     }, right ? 900 : 1500);
   }
 });
+
+/* ---------- Goldiee: only for something to do, and she takes you there ---------- */
+function goldieeNudge() {
+  const g = window.goldiee; if (!g) return;
+  if (!KEY || !NAME) return g.say("this phone isn't set up to write yet 🔑", "./", "set it up →");
+  const waiting = entries.find(e => e.prompt && !e.together && e.author !== NAME && !answeredBy(entries, NAME, e.prompt.id));
+  if (waiting) return g.say(`${waiting.author} answered a question. Answer it too to see theirs 💭`, answerLink(waiting.prompt), "answer it →");
+  const seen = Number(store.get("diary-seen-" + NAME)) || 0;
+  const fresh = entries.filter(e => new Date(e.at).getTime() > seen && (e.by || e.author) !== NAME).length;
+  if (fresh) return g.say(`${fresh} new ${fresh === 1 ? "page" : "pages"} from ${partnerOf(NAME)} in the diary 💌`, "./", "show me →");
+  const tq = todaysQuestion();
+  if (!answeredBy(entries, NAME, tq.id)) return g.say("today's question is waiting for you ☀️", answerLink(tq), "answer it →");
+}
 
 /* ---------- progress ---------- */
 function renderProgress() {
@@ -163,7 +175,7 @@ function renderProgress() {
 (async () => {
   try { entries = (await loadIndex()).entries; } catch { entries = []; }
   renderToday();
-  if (NAME && !answeredBy(entries, NAME, todaysQuestion().id)) setTimeout(() => window.goldiee?.say("today's question is a good one, I sniffed it ☀️"), 2500);
+  setTimeout(goldieeNudge, 1500);
   renderMemoryIntro();
   renderProgress();
 })();

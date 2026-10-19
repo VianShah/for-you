@@ -7,7 +7,7 @@
    only has "Contents: read & write" on this one repo). It's kept
    in this browser only — never in the code.
    ========================================================== */
-const PEOPLE = ["Vian", "Jovina"];
+const PEOPLE = ["Vian", "Jovena"];
 const OWNER = "VianShah";
 const REPO = "for-you";
 const BRANCH = "main";
@@ -17,7 +17,7 @@ const MEDIA_DIR = "diary/media/";
 // Notifications go through ntfy.sh (free, no account). Each person installs the
 // ntfy app and subscribes to their own topic below. Only "X added a page" is sent,
 // never what the page says.
-const NOTIFY_TOPICS = { Vian: "for-you-vian-k7q2m9x4", Jovina: "for-you-jovina-r3w8p1z6" };
+const NOTIFY_TOPICS = { Vian: "for-you-vian-k7q2m9x4", Jovena: "for-you-jovena-r3w8p1z6" };
 
 // On a local preview, read from the files next to this page instead of GitHub.
 const LOCAL = ["localhost", "127.0.0.1"].includes(location.hostname);

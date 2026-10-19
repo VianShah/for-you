@@ -108,13 +108,26 @@ async function refresh() {
     entries = (await loadIndex()).entries;
     lastSeen = Number(store.get("diary-seen-" + NAME)) || 0;
     render();
-    const fresh = $$(".new-ribbon").length;
-    if (fresh) setTimeout(() => window.goldiee?.say(`woof! ${fresh} new ${fresh === 1 ? "page" : "pages"} from ${partnerOf(NAME)} 💌`), 1200);
+    setTimeout(goldieeNudge, 1500);
     // Remember this visit a moment later, so the ribbons show this time but not next time.
     if (NAME) setTimeout(() => store.set("diary-seen-" + NAME, String(Date.now())), 1500);
   } catch (e) {
     book.innerHTML = `<p class="empty">Couldn't open the diary right now.<br><small>${esc(e.message)}</small></p>`;
   }
+}
+
+// Goldiee only shows up with the most important thing to do, and takes you to it.
+function goldieeNudge() {
+  const g = window.goldiee; if (!g || $$(".sheet-back").some(b => !b.hidden)) return;
+  if (!KEY) return g.say("this phone isn't unlocked yet. I'll show you how 🔑", () => openSettings(`To write, open the setup link sent to you. Ask ${PEOPLE[0]} for it ♥`), "unlock →");
+  if (!NAME) return g.say("whose phone is this? tell me so I sign your pages 🐾", () => openSettings("First, tap whose phone this is."), "choose →");
+  const waiting = entries.find(isLocked);
+  if (waiting) return g.say(`${waiting.author} answered a question. Answer it too to see theirs 💭`, () => startAnswer(waiting.prompt), "answer it →");
+  const fresh = $$(".new-ribbon");
+  if (fresh.length) return g.say(`${fresh.length} new ${fresh.length === 1 ? "page" : "pages"} from ${partnerOf(NAME)} 💌`,
+    () => fresh[0].closest(".card").scrollIntoView({ behavior: reduceMotion ? "auto" : "smooth", block: "center" }), "show me →");
+  const tq = todaysQuestion();
+  if (!answeredBy(entries, NAME, tq.id)) return g.say("today's question is waiting for you ☀️", () => startAnswer(tq), "answer it →");
 }
 
 /* ---------- filters ---------- */
@@ -441,7 +454,10 @@ composer.addEventListener("submit", async e => {
     const r = $(`.card[data-id="${id}"]`)?.getBoundingClientRect();
     burst(r ? r.left + r.width / 2 : innerWidth / 2, r ? r.top + 40 : innerHeight / 2, 24);
     toast("Stuck in the diary ♥");
-    window.goldiee?.say(entry.prompt ? `ooh, an answer! I bet ${partnerOf(NAME)} can't wait to read it 🐾` : "yay! that one's going in my favourites 🐾", 5000);
+    // If this answer just unlocked the other person's, Goldiee takes you to it.
+    const theirs = entry.prompt && entries.find(x => x.id !== id && x.prompt?.id === entry.prompt.id && x.author !== NAME);
+    if (theirs) setTimeout(() => window.goldiee?.say(`${theirs.author}'s answer is unlocked 🔓`,
+      () => $(`.card[data-id="${CSS.escape(theirs.id)}"]`)?.scrollIntoView({ behavior: reduceMotion ? "auto" : "smooth", block: "center" }), "read it →"), 1200);
   } catch (err) {
     setStatus(st, err.message, true);
   } finally {
