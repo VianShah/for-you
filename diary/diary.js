@@ -155,7 +155,7 @@ function goldieeNudge() {
   const fresh = $$(".new-ribbon");
   if (fresh.length) return g.say(`${fresh.length} new ${fresh.length === 1 ? "page" : "pages"} from ${partnerOf(NAME)} 💌`,
     () => fresh[0].closest(".card").scrollIntoView({ behavior: reduceMotion ? "auto" : "smooth", block: "center" }), "show me →");
-  const tq = todaysQuestion();
+  const tq = todaysQuestion(new Date(), entries);
   if (!answeredBy(entries, NAME, tq.id)) return g.say("today's question is waiting for you ☀️", () => startAnswer(tq), "answer it →");
 }
 

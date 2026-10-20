@@ -7,7 +7,7 @@ const bothAnswered = qid => PEOPLE.every(p => answeredBy(entries, p, qid));
 
 /* ---------- today's question ---------- */
 function renderToday() {
-  const q = todaysQuestion();
+  const q = todaysQuestion(new Date(), allPages);
   $("#todayCard").innerHTML = `<small>${catTag(q.cat)}</small><p>${esc(q.q)}</p>`;
   $("#todayWho").innerHTML = PEOPLE.map(p =>
     `<span class="${answeredBy(entries, p, q.id) ? "done" : ""}">${answeredBy(entries, p, q.id) ? "✓" : "…"} ${esc(p)}</span>`).join("");
@@ -18,7 +18,30 @@ function renderToday() {
         ? `<a class="save" href="./">read both answers in the diary →</a>`
         : `<p class="hint">You've answered ✓ Waiting for ${esc(other)}. Their answer will show up in the diary.</p>`)
     : `<a class="save" href="${answerLink(q)}">answer it ✍️</a><button class="ghost" data-talk>ask out loud instead 💬</button>`;
+  // Not feeling it? Retire it for both of you; tomorrow's lineup stays the same.
+  if (!mine && KEY && NAME) $("#todayActions").insertAdjacentHTML("beforeend", `<button class="ghost quiet-btn" data-retire="${esc(q.id)}" data-where="today">🚫 not for us</button>`);
 }
+
+/* ---------- "not for us": retires a question for both of you ---------- */
+async function retireQuestion(qid) {
+  if (!confirm("Retire this question for both of you? A new one takes its place.")) return false;
+  try {
+    const skip = { id: Date.now().toString(36) + Math.random().toString(36).slice(2, 6), type: "skip", qid, by: NAME, at: new Date().toISOString() };
+    allPages = await updateIndex(list => [skip, ...list], `${NAME} retired a question`);
+    entries = allPages.filter(e => !e.status && ["note", "photo", "voice"].includes(e.type));
+    toast("Gone. Here's another one ✨");
+    return true;
+  } catch (err) { toast(err.message); return false; }
+}
+document.addEventListener("click", async e => {
+  const b = e.target.closest("[data-retire]"); if (!b) return;
+  b.disabled = true;
+  const done = await retireQuestion(b.dataset.retire);
+  b.disabled = false;
+  if (!done) return;
+  if (b.dataset.where === "today") renderToday(); else $("#jar").click();
+  renderProgress();
+});
 
 /* ---------- question jar ---------- */
 let cat = "any";
@@ -33,7 +56,7 @@ $("#cats").addEventListener("click", e => {
 
 function pullQuestion() {
   const seen = store.get("jar-seen").split(",").filter(Boolean);
-  let pool = QUESTIONS.filter(q => cat === "any" || q.cat === cat);
+  let pool = liveQuestions(allPages).filter(q => cat === "any" || q.cat === cat); // "anything" mixes every topic
   // Prefer questions this phone hasn't answered and hasn't pulled lately.
   const fresh = pool.filter(q => !(NAME && answeredBy(entries, NAME, q.id)) && !seen.includes(q.id));
   if (fresh.length) pool = fresh;
@@ -55,7 +78,8 @@ $("#jar").addEventListener("click", () => {
     `${who.length ? `<p class="hint">Already answered by ${who.map(esc).join(" & ")}</p>` : ""}
      <a class="save" href="${answerLink(current)}">answer in the diary ✍️</a>
      <button class="ghost" data-talk>ask out loud 💬</button>
-     <button class="ghost" id="againBtn">another one ↻</button>`;
+     <button class="ghost" id="againBtn">another one ↻</button>
+     ${KEY && NAME ? `<button class="ghost quiet-btn" data-retire="${esc(current.id)}" data-where="jar">🚫 not for us</button>` : ""}`;
   const r = card.getBoundingClientRect();
   burst(r.left + r.width / 2, r.top + 20, 10);
 });
@@ -162,14 +186,14 @@ function goldieeNudge() {
   const seen = Number(store.get("diary-seen-" + NAME)) || 0;
   const fresh = entries.filter(e => new Date(e.at).getTime() > seen && (e.by || e.author) !== NAME).length;
   if (fresh) return g.say(`${fresh} new ${fresh === 1 ? "page" : "pages"} from ${partnerOf(NAME)} in the diary 💌`, "./", "show me →");
-  const tq = todaysQuestion();
+  const tq = todaysQuestion(new Date(), allPages);
   if (!answeredBy(entries, NAME, tq.id)) return g.say("today's question is waiting for you ☀️", answerLink(tq), "answer it →");
 }
 
 /* ---------- progress ---------- */
 function renderProgress() {
   $("#progress").innerHTML = Object.entries(CATEGORIES).map(([id, c]) => {
-    const qs = QUESTIONS.filter(q => q.cat === id);
+    const qs = liveQuestions(allPages).filter(q => q.cat === id); // retired ones don't count
     const n = qs.filter(q => bothAnswered(q.id)).length;
     return `<div class="prog"><span>${c.emoji} ${esc(c.label)}</span><div class="prog-bar"><i style="width:${n / qs.length * 100}%"></i></div><b>${n}/${qs.length}</b></div>`;
   }).join("");

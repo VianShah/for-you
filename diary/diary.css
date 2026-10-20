@@ -317,6 +317,8 @@ textarea.field.hand { font-family: var(--hand); font-size: 24px; line-height: 1.
 .post-card .photo img { cursor: zoom-in; }
 .post-actions { display: flex; flex-wrap: wrap; gap: 8px; justify-content: center; margin: 14px 0 6px; }
 .post-actions .ghost { padding: 9px 14px; font-size: 13px; }
+.ghost.quiet-btn { opacity: .7; font-size: 13px; }
+.ghost.quiet-btn:hover { opacity: 1; }
 .ghost.danger { color: #b3263e; border-color: rgba(179,38,62,.35); }
 .replies-label { margin-top: 14px; text-align: center; }
 .replies { display: flex; flex-direction: column; gap: 8px; padding: 4px 2px 8px; }
