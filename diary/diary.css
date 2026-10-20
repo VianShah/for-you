@@ -134,9 +134,9 @@ main { position: relative; z-index: 1; max-width: 1180px; margin: 0 auto; paddin
 .fab:hover { transform: scale(1.08) rotate(90deg); }
 
 /* ---------- sheets ---------- */
-.sheet-back { position: fixed; inset: 0; z-index: 40; background: rgba(58,32,38,.42); display: grid; place-items: center; padding: 16px; animation: fade .25s both; }
+.sheet-back { overscroll-behavior: contain; position: fixed; inset: 0; z-index: 40; background: rgba(58,32,38,.42); display: grid; place-items: center; padding: 16px; animation: fade .25s both; }
 @keyframes fade { from { opacity: 0; } }
-.sheet { width: min(560px, 100%); max-height: calc(100svh - 32px); overflow-y: auto; background: var(--paper); border-radius: 18px; padding: 22px 22px 18px;
+.sheet { overscroll-behavior: contain; -webkit-overflow-scrolling: touch; width: min(560px, 100%); max-height: calc(100svh - 32px); overflow-y: auto; background: var(--paper); border-radius: 18px; padding: 22px 22px 18px;
   box-shadow: 0 30px 60px -20px rgba(0,0,0,.4); animation: up .35s cubic-bezier(.2,.7,.2,1) both; }
 .sheet.small { width: min(440px, 100%); }
 @keyframes up { from { transform: translateY(30px); opacity: 0; } }
@@ -318,6 +318,10 @@ textarea.field.hand { font-family: var(--hand); font-size: 24px; line-height: 1.
 .post-actions { display: flex; flex-wrap: wrap; gap: 8px; justify-content: center; margin: 14px 0 6px; }
 .post-actions .ghost { padding: 9px 14px; font-size: 13px; }
 .ghost.quiet-btn { opacity: .7; font-size: 13px; }
+.live-preview { display: grid; place-items: center; padding: 26px 16px 22px; margin-bottom: 6px; border-radius: 14px; pointer-events: none;
+  background-color: rgba(110,35,55,.04); background-image: radial-gradient(rgba(110,35,55,.09) 1px, transparent 1.2px); background-size: 18px 18px; }
+.live-preview .card { width: min(300px, 100%); animation: none; }
+:root[data-theme="dark"] .live-preview { background-color: rgba(0,0,0,.2); background-image: radial-gradient(rgba(243,214,219,.07) 1px, transparent 1.2px); }
 .ghost.quiet-btn:hover { opacity: 1; }
 .ghost.danger { color: #b3263e; border-color: rgba(179,38,62,.35); }
 .replies-label { margin-top: 14px; text-align: center; }

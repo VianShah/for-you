@@ -260,6 +260,24 @@ function goldieeCry(list, action) {
   return true;
 }
 
+/* ---------- freeze the page behind any open popup ---------- */
+// iPhones ignore overflow:hidden on the page, so the page is pinned in place while a
+// sheet, lightbox or dialog is open, and put back exactly where it was when it closes.
+let frozenAt = null;
+function syncScrollLock() {
+  const open = $$(".sheet-back, .lightbox").some(el => !el.hidden && el.isConnected);
+  const s = document.body.style;
+  if (open && frozenAt === null) {
+    frozenAt = scrollY;
+    Object.assign(s, { position: "fixed", top: `-${frozenAt}px`, left: "0", right: "0", width: "100%" });
+  } else if (!open && frozenAt !== null) {
+    Object.assign(s, { position: "", top: "", left: "", right: "", width: "" });
+    window.scrollTo(0, frozenAt);
+    frozenAt = null;
+  }
+}
+new MutationObserver(syncScrollLock).observe(document.body, { subtree: true, childList: true, attributes: true, attributeFilter: ["hidden"] });
+
 /* ---------- small helpers ---------- */
 function hash(str) { let h = 2166136261; for (const c of String(str)) h = Math.imul(h ^ c.charCodeAt(0), 16777619); return h >>> 0; }
 function rand(seed, i) { return ((hash(seed + ":" + i) % 1000) / 1000); }

@@ -78,7 +78,7 @@ function cardHtml(e) {
     const frame = ["polaroid", "tape", "film", "heart", "stamp"].includes(e.frame) ? e.frame : "polaroid";
     const fcls = frame === "tape" ? "tape-frame" : frame;
     return `<article class="card photo ${fcls}${cls}" ${common}>${frame === "tape" ? tapeHtml(e, 2) : ""}${top}
-      <div class="body"><div class="wrap"><img ${imgSrcAttrs(e.media)} alt="${esc(e.caption || "a picture of us")}" loading="lazy"></div>
+      <div class="body"><div class="wrap"><img ${e.previewSrc ? `src="${e.previewSrc}"` : imgSrcAttrs(e.media)} alt="${esc(e.caption || "a picture of us")}" loading="lazy"></div>
       ${e.caption ? `<div class="cap">${esc(e.caption)}</div>` : ""}${guessHtml(e)}</div>${lock}${binNote}${signHtml(e)}</article>`;
   }
   if (e.type === "voice") {
@@ -408,6 +408,7 @@ function canWrite() {
 function openComposer() {
   setStatus($("#status"), "");
   if (!openedAt) openedAt = Date.now();
+  setTimeout(updatePreview);
   const p = state.prompt;
   $("#promptBanner").hidden = !p;
   $("#guessBlock").hidden = !p;
@@ -440,6 +441,7 @@ $$(".tab", composer).forEach(t => t.addEventListener("click", () => {
   state.type = t.dataset.type;
   $$(".tab", composer).forEach(x => x.classList.toggle("on", x === t));
   $$(".pane", composer).forEach(p => p.hidden = p.dataset.pane !== state.type);
+  updatePreview();
   if (state.type !== "voice") stopRecording();
 }));
 
@@ -447,6 +449,7 @@ $$(".choices", composer).forEach(group => group.addEventListener("click", e => {
   const c = e.target.closest(".choice"); if (!c) return;
   $$(".choice", group).forEach(x => x.classList.toggle("on", x === c));
   state[group.dataset.choice] = c.dataset.v;
+  updatePreview();
 }));
 
 const picker = $("#stickerPicker");
@@ -458,6 +461,7 @@ picker.addEventListener("click", e => {
   else if (state.stickers.length < 4) state.stickers.push(s);
   else return toast("Four stickers max per page");
   b.classList.toggle("on", i < 0);
+  updatePreview();
 });
 
 /* photo: shrink to max 1600px so the repo stays light */
@@ -481,6 +485,7 @@ $("#photoInput").addEventListener("change", async e => {
     state.photoFile = file; state.mirror = false;
     state.photo = await shrinkImage(file);
     $("#flipBtn").hidden = false;
+    updatePreview();
     const prev = $("#photoPreview");
     prev.src = URL.createObjectURL(state.photo); prev.hidden = false;
     $("#dropText").hidden = true;
@@ -493,6 +498,7 @@ $("#flipBtn").addEventListener("click", async () => {
   state.mirror = !state.mirror;
   state.photo = await shrinkImage(state.photoFile, 1600, state.mirror);
   $("#photoPreview").src = URL.createObjectURL(state.photo);
+  updatePreview();
 });
 
 /* voice recording */
@@ -520,6 +526,7 @@ recBtn.addEventListener("click", async () => {
     recPreview.src = URL.createObjectURL(state.voice); recPreview.hidden = false;
     recTime.textContent = `${fmtDur(state.duration)} · tap to re-record`;
     recBtn.classList.remove("recording");
+    updatePreview();
   };
   recorder.start();
   recStart = Date.now();
@@ -535,6 +542,28 @@ function stopRecording() {
   clearInterval(recTimer);
   if (recorder && recorder.state === "recording") recorder.stop();
 }
+
+/* ---------- live preview: the card exactly as it will look ---------- */
+let previewPhotoUrl = "";
+function updatePreview() {
+  const box = $("#livePreview"); if (!box) return;
+  const f = composer.elements;
+  const together = state.from === "together";
+  const draft = {
+    id: "preview", type: state.type, author: together ? PEOPLE.join(" & ") : (NAME || PEOPLE[0]), by: NAME, together,
+    at: new Date().toISOString(), stickers: [...state.stickers], prompt: state.prompt || undefined,
+    guess: state.prompt && !together ? f.guess.value.trim() : "",
+  };
+  if (state.type === "note") Object.assign(draft, { paper: state.paper, title: state.prompt ? "" : f.title.value.trim(), text: f.text.value.trim() || "Dear you…" });
+  if (state.type === "photo") {
+    if (state.photo) { if (previewPhotoUrl) URL.revokeObjectURL(previewPhotoUrl); previewPhotoUrl = URL.createObjectURL(state.photo); }
+    Object.assign(draft, { frame: state.frame, caption: f.caption.value.trim(), media: "preview.jpg",
+      previewSrc: state.photo ? previewPhotoUrl : "data:image/svg+xml," + encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 4 3"><rect width="4" height="3" fill="#f3d9d4"/></svg>') });
+  }
+  if (state.type === "voice") Object.assign(draft, { title: f.voiceTitle.value.trim(), duration: Math.round(state.duration) });
+  box.innerHTML = cardHtml(draft);
+}
+composer.addEventListener("input", updatePreview);
 
 function resetComposer() {
   composer.reset();
