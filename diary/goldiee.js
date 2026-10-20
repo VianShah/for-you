@@ -31,6 +31,17 @@
   :root[data-theme="dark"] .goldiee-bubble { background: #2c1e22; color: #f2e4e7; border-color: rgba(243,214,219,.16); box-shadow: 0 10px 24px -12px #000; }
   :root[data-theme="dark"] .goldiee-bubble b { color: #f2a7b1; }
   :root[data-theme="dark"] .goldiee-go { background: #a33a55; }
+  .goldiee .frown, .goldiee .tears { display: none; }
+  .goldiee.crying .tongue { display: none; }
+  .goldiee.crying .frown, .goldiee.crying .tears { display: inline; }
+  .goldiee.crying .tear { animation: g-tear 1.3s ease-in infinite; }
+  .goldiee.crying .t2 { animation-delay: .65s; }
+  @keyframes g-tear { 0% { transform: translateY(0); opacity: 0; } 15% { opacity: 1; } 100% { transform: translateY(16px); opacity: 0; } }
+  .goldiee.crying .ear-l { transform: rotate(14deg); animation: none; }
+  .goldiee.crying .ear-r { transform: rotate(-14deg); animation: none; }
+  .goldiee.crying.up .goldiee-pup { animation: g-sob 1.6s ease-in-out infinite; }
+  @keyframes g-sob { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(2px) rotate(-2deg); } }
+  .goldiee.crying .goldiee-bubble b::after { content: " is sad"; font-weight: 400; }
   @media print { .goldiee { display: none; } }`;
 
   // A golden-retriever pup peeking over the edge: floppy ears, fluffy cheeks, little tongue, pink bow.
@@ -47,6 +58,8 @@
     <ellipse cx="50" cy="55.5" rx="4.6" ry="3.4" fill="#2b1a17"/>
     <path d="M50 58.5v2.5m0 0c-2 2.6-5 2.6-6.5 .8M50 61c2 2.6 5 2.6 6.5 .8" stroke="#2b1a17" stroke-width="1.4" fill="none" stroke-linecap="round"/>
     <path class="tongue" d="M46.6 62.6c0 5 1.6 7 3.4 7s3.4-2 3.4-7c-1.2 .9-5.6 .9-6.8 0z" fill="#ea7f8d"/>
+    <path class="frown" d="M44.5 64.5c3.4-3 7.6-3 11 0" stroke="#2b1a17" stroke-width="1.6" fill="none" stroke-linecap="round"/>
+    <g class="tears" fill="#8fd0ff"><path class="tear t1" d="M37 50c-1.6 3-2.4 4.8-2.4 6a2.4 2.4 0 0 0 4.8 0c0-1.2-.8-3-2.4-6z"/><path class="tear t2" d="M63 50c-1.6 3-2.4 4.8-2.4 6a2.4 2.4 0 0 0 4.8 0c0-1.2-.8-3-2.4-6z"/></g>
     <ellipse cx="31" cy="54" rx="4.5" ry="2.8" fill="#f39aa6" opacity=".55"/><ellipse cx="69" cy="54" rx="4.5" ry="2.8" fill="#f39aa6" opacity=".55"/>
     <path d="M44 21c2-4 4-5 6-5s4 1 6 5c-2-1.5-4-2-6-2s-4 .5-6 2z" fill="#e4a24b"/>
     <circle cx="68" cy="22" r="5" fill="#d97b86"/><circle cx="76" cy="20" r="5" fill="#d97b86"/><circle cx="72" cy="22" r="2.6" fill="#6e2337"/>
@@ -86,5 +99,6 @@
   root.querySelector(".goldiee-bubble").addEventListener("click", run);
   root.querySelector(".goldiee-x").addEventListener("click", hide);
 
-  window.goldiee = { say, hide };
+  const cry = on => root.classList.toggle("crying", !!on);
+  window.goldiee = { say, hide, cry };
 })();

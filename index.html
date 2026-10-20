@@ -7,7 +7,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,400;0,500;1,400;1,500&family=Pinyon+Script&family=Jost:wght@300;400&display=swap" rel="stylesheet">
-<script src="diary/theme.js?v=2026102101"></script>
+<script src="diary/theme.js?v=2026102102"></script>
 <style>
   :root {
     --cream: #fbf5ef;
@@ -314,7 +314,7 @@
 
 <footer>made with every bit of me</footer>
 
-<script src="diary/vault.js?v=2026102101"></script>
+<script src="diary/vault.js?v=2026102102"></script>
 <script>
 /* ==========================================================
    EDIT HERE: every memory the photo strip rotates through.
@@ -375,6 +375,7 @@ const frames = [...track.querySelectorAll(".frame")];
 /* ---------- media: plain files, or decrypted behind our secret word ---------- */
 let vaultKey = null;
 async function mediaSrc(m) {
+  if (m.src.endsWith(".enc")) return Vault.mediaUrl(vaultKey, m.src, m.src); // a diary picture pinned with goldies
   return vaultKey ? Vault.mediaUrl(vaultKey, m.src + ".enc", m.src) : m.src;
 }
 // Puts a memory into a frame, fading it in over whatever was there.
@@ -423,9 +424,26 @@ function rotate() {
   show(fig, nextMemory(fig.dataset.shape), frames.indexOf(fig));
 }
 
+// Pictures from the diary that one of you pinned with goldies 🏠 join the strip, first in line.
+async function addPinnedPictures() {
+  try {
+    const r = await fetch("diary/entries.json?t=" + Date.now(), { cache: "no-store" });
+    if (!r.ok) return;
+    let list = await r.json();
+    if (list && list.enc) list = vaultKey ? JSON.parse(await Vault.decryptText(vaultKey, list.enc)) : [];
+    const pinned = (Array.isArray(list) ? list : []).filter(e => e.pin && !e.status && e.type === "photo" && e.media)
+      .sort((a, b) => Date.parse(b.pin.at) - Date.parse(a.pin.at));
+    for (const e of pinned.reverse()) {
+      const m = { src: e.media, tag: `PINNED BY ${e.pin.by.toUpperCase()}`, caption: e.caption || "a favourite from our diary", wide: !!e.pin.wide };
+      queues[m.wide ? "wide" : "tall"].unshift(m);
+    }
+  } catch {}
+}
+
 (async function loadMemories() {
   const vault = window.Vault && await Vault.fetchVault("diary/vault.json");
   if (vault) vaultKey = await Vault.cached(vault) || await Vault.lockScreen(vault, { title: "Hey you.", hint: "Type our secret word to come in." });
+  await addPinnedPictures();
   frames.forEach((f, i) => show(f, nextMemory(f.dataset.shape), i));
   setInterval(rotate, ROTATE_EVERY);
 })();

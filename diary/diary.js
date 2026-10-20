@@ -109,6 +109,7 @@ function render() {
       : filter === "bin" ? ["The bin is empty", `removed pages wait here for ${BIN_DAYS} days before they're gone for good`]
       : [wall.length ? "Nothing here yet" : "The first page is waiting", KEY ? "tap ＋ to stick something in, or try the mini games for a question" : "open your setup link to start writing"];
     book.innerHTML = `<div class="empty"><b>${msg[0]}</b>${msg[1]}</div>`;
+    renderGoldieBar(entries);
     return;
   }
   const days = new Map();
@@ -117,6 +118,7 @@ function render() {
     if (!days.has(d)) days.set(d, []);
     days.get(d).push(e);
   }
+  renderGoldieBar(entries);
   book.innerHTML = [...days].map(([d, es]) =>
     `<section class="day"><div class="day-label">${esc(d)}</div><div class="grid">${es.map(cardHtml).join("")}</div></section>`
   ).join("");
@@ -142,6 +144,7 @@ function goldieeNudge() {
   const g = window.goldiee; if (!g || $$(".sheet-back").some(b => !b.hidden)) return;
   if (!KEY) return g.say("this phone isn't unlocked yet. I'll show you how 🔑", () => openSettings(`To write, open the setup link sent to you. Ask ${PEOPLE[0]} for it ♥`), "unlock →");
   if (!NAME) return g.say("whose phone is this? tell me so I sign your pages 🐾", () => openSettings("First, tap whose phone this is."), "choose →");
+  if (goldieeCry(entries, () => { state.prompt = null; openComposer(); })) return;
   const waiting = entries.find(isLocked);
   if (waiting) return g.say(`${waiting.author} answered a question. Answer it too to see theirs 💭`, () => startAnswer(waiting.prompt), "answer it →");
   const replied = entries.find(e => onWall(e) && (e.replies || []).some(r => isFresh(r.at, r.by)));
@@ -566,7 +569,10 @@ composer.addEventListener("submit", async e => {
       entry.mediaSha = res.content.sha;
     }
     setStatus(st, "Sticking it in…");
+    const before = myPoints(entries);
     entries = await updateIndex(list => [entry, ...list], `A new ${kind} from ${entry.author}`);
+    pointsToast(before, entries);
+    window.goldiee?.cry(Goldies.score(entries, NAME).crying);
     notifyPartner(
       entry.prompt ? `${entry.author} answered a question 💭` : `${entry.author} added a new ${kind} 💌`,
       entry.prompt ? `"${entry.prompt.q}" Answer it too to see theirs.` : "Open the diary to see it."
@@ -602,4 +608,7 @@ if (askedQ) history.replaceState(null, "", location.pathname);
   if (justPaired && !VAULT) return openSettings(NAME ? `Unlocked ♥ Welcome back, ${NAME}.` : "Unlocked ♥ Now tap whose phone this is.");
   if (VAULT && !NAME) return openSettings("Welcome in ♥ Tap whose phone this is.");
   if (askedQ) startAnswer(questionById(askedQ));
+  // Keep the countdown fresh, and let a sad Goldiee speak up again every 15 minutes.
+  setInterval(() => renderGoldieBar(entries), 60000);
+  setInterval(() => { if (!$$(".sheet-back").some(b => !b.hidden)) goldieeCry(entries, () => { state.prompt = null; openComposer(); }); }, 15 * 60000);
 })();

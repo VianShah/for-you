@@ -206,6 +206,58 @@ function notifyPartner(title, message) {
   }).catch(() => {});
 }
 
+/* ---------- goldie points 🪙 (rules live in goldies.js) ---------- */
+function fmtMins(m) { m = Math.max(0, Math.round(m)); return m >= 60 ? `${Math.floor(m / 60)}h ${m % 60}m` : `${m}m`; }
+function renderGoldieBar(list) {
+  const el = $("#goldieBar"); if (!el || !window.Goldies) return;
+  const s = PEOPLE.map(p => Goldies.score(list, p));
+  const pill = x => `<span class="gp${x.name === NAME ? " me" : ""}${x.crying ? " sad" : ""}">${esc(x.name)} <b>🪙 ${x.points}</b>${x.crying ? " 😢" : ""}</span>`;
+  const mine = s.find(x => x.name === NAME);
+  const hint = !mine ? "" : Goldies.isAwake(Date.now())
+    ? `your next −5 in ${fmtMins(mine.nextPenaltyIn)} · post or reply to reset it`
+    : "night time · no goldies lost while you sleep 🌙";
+  el.innerHTML = `${pill(s[0])}<span class="gstreak" title="days in a row you both posted">🔥 ${Goldies.streak(list, PEOPLE)}</span>${pill(s[1])}${hint ? `<small>${hint}</small>` : ""}`;
+  el.hidden = false;
+  el.onclick = () => openGoldieRules(list);
+}
+function openGoldieRules(list) {
+  const R = Goldies.RULES, me = NAME && Goldies.score(list, NAME);
+  const when = at => new Date(at).toLocaleString("en-GB", { day: "numeric", month: "short", hour: "numeric", minute: "2-digit", hour12: true }).toLowerCase();
+  const hist = me ? me.history.slice(0, 10).map(h => `<li><b class="${h.pts < 0 ? "minus" : ""}">${h.pts > 0 ? "+" : ""}${h.pts}</b> ${esc(h.why)} <small>${when(h.at)}</small></li>`).join("") : "";
+  const back = document.createElement("div");
+  back.className = "sheet-back";
+  back.innerHTML = `<div class="sheet small goldie-rules"><div class="sheet-head"><h2>Goldie points</h2><button type="button" class="icon-btn close" data-close>✕</button></div>
+    <p class="help">Goldiee loves it when you two keep writing to each other. Earn goldies 🪙 by showing up, and lose a few when it goes quiet.</p>
+    <ul class="rules">
+      <li><b>+${R.TEXT}</b> a note or a text reply</li>
+      <li><b>+${R.VOICE}</b> a voice note</li>
+      <li><b>+${R.LONG}</b> opening your heart (over ${R.LONG_CHARS} characters)</li>
+      <li><b>+${R.PHOTO}</b> a picture</li>
+      <li><b class="minus">−${R.PENALTY}</b> every 2.5 hours without posting or replying (only ${R.AWAKE_FROM} am – ${R.AWAKE_TO - 12} pm)</li>
+      <li><b class="minus">−${R.PIN_COST}</b> pin one of your pictures to the love page 🏠</li>
+    </ul>
+    <p class="help">Below 0, Goldiee starts crying 😢, and every 15 minutes the other one gets a ping about it. 🔥 counts the days in a row you <em>both</em> posted.</p>
+    ${me ? `<div class="label">your last goldies</div><ul class="history">${hist || "<li>nothing yet, so go write something ♥</li>"}</ul>` : ""}</div>`;
+  back.addEventListener("click", e => { if (e.target === back || e.target.closest("[data-close]")) back.remove(); });
+  document.body.appendChild(back);
+}
+// After saving: "+15 goldies 🪙"
+function pointsToast(before, list) {
+  if (!NAME || !window.Goldies) return;
+  const d = Goldies.score(list, NAME).points - before;
+  if (d > 0) setTimeout(() => toast(`+${d} goldies 🪙`), 900);
+}
+const myPoints = list => NAME && window.Goldies ? Goldies.score(list, NAME).points : 0;
+// Below 0, Goldiee cries; tapping her takes you somewhere to cheer her up.
+function goldieeCry(list, action) {
+  const g = window.goldiee; if (!g || !NAME || !window.Goldies) return false;
+  const me = Goldies.score(list, NAME);
+  g.cry(me.crying);
+  if (!me.crying) return false;
+  g.say(`I'm crying… you're at ${me.points} goldies 😢 write something to cheer me up?`, action, "cheer me up →");
+  return true;
+}
+
 /* ---------- small helpers ---------- */
 function hash(str) { let h = 2166136261; for (const c of String(str)) h = Math.imul(h ^ c.charCodeAt(0), 16777619); return h >>> 0; }
 function rand(seed, i) { return ((hash(seed + ":" + i) % 1000) / 1000); }

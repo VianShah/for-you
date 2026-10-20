@@ -1,0 +1,27 @@
+name: Goldiee
+# Every 15 minutes: if someone's goldie points are below 0 (and it's not night time
+# in India), Goldiee cries and the other person gets a ping. See .github/goldiee-robot.mjs.
+on:
+  schedule:
+    - cron: "*/15 * * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: goldiee
+  cancel-in-progress: true
+
+jobs:
+  cry:
+    runs-on: ubuntu-latest
+    timeout-minutes: 3
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - run: node .github/goldiee-robot.mjs
+        env:
+          VAULT_KEY: ${{ secrets.VAULT_KEY }}

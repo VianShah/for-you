@@ -361,6 +361,28 @@ textarea.field.hand { font-family: var(--hand); font-size: 24px; line-height: 1.
 :root[data-theme="dark"] .reply-badge { background: #2c1e22; color: #f2a7b1; }
 :root[data-theme="dark"] .bin-note { color: #b3263e; }
 
+/* ================= goldie points bar ================= */
+.goldie-bar { display: flex; flex-wrap: wrap; align-items: center; justify-content: center; gap: 6px 10px; margin: 18px auto 0; max-width: 460px;
+  padding: 8px 14px; border-radius: 18px; background: rgba(255,250,243,.85); border: 1px solid var(--line); box-shadow: 0 8px 20px -14px rgba(110,35,55,.45); }
+.goldie-bar[hidden] { display: none; }
+.goldie-bar .gp { font-size: 14px; color: var(--ink); }
+.goldie-bar .gp b { font-weight: 500; color: #a8741a; }
+.goldie-bar .gp.me { font-weight: 400; }
+.goldie-bar .gp.sad b { color: #b3263e; }
+.goldie-bar .gstreak { font-size: 15px; padding: 2px 10px; border-radius: 999px; background: #fff1d6; }
+.goldie-bar small { flex-basis: 100%; text-align: center; font-size: 11px; color: var(--muted); letter-spacing: .03em; }
+.goldie-rules .rules, .goldie-rules .history { list-style: none; display: grid; gap: 6px; margin: 4px 0 14px; font-size: 14px; }
+.goldie-rules .rules b, .goldie-rules .history b { display: inline-block; min-width: 46px; color: #a8741a; font-weight: 500; }
+.goldie-rules b.minus { color: #b3263e; }
+.goldie-rules .history small { color: var(--muted); font-size: 11px; margin-left: 4px; }
+.ghost.pinned { border-color: #e0b04f; background: #fff7e3; }
+:root[data-theme="dark"] .goldie-bar { background: rgba(34,23,25,.85); border-color: rgba(243,214,219,.14); box-shadow: none; }
+:root[data-theme="dark"] .goldie-bar .gp { color: #f2e4e7; }
+:root[data-theme="dark"] .goldie-bar .gp b, :root[data-theme="dark"] .goldie-rules b { color: #f0c46a; }
+:root[data-theme="dark"] .goldie-bar .gstreak { background: #3a2a14; }
+:root[data-theme="dark"] .goldie-bar small, :root[data-theme="dark"] .goldie-rules .history small { color: #b79ca2; }
+:root[data-theme="dark"] .ghost.pinned { background: #3a2a14; border-color: #a8741a; }
+
 /* ================= theme toggle button ================= */
 .theme-btn { position: absolute; right: 56px; top: 14px; }
 .games .theme-btn { right: 12px; }

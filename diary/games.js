@@ -1,5 +1,6 @@
 /* Mini games: built from questions.js and the pages already in the diary. */
 let entries = [];
+let allPages = []; // every page, for goldie points (archived ones still count)
 const answerLink = q => `./?q=${encodeURIComponent(q.id)}`;
 const catTag = cat => { const c = CATEGORIES[cat]; return c ? `${c.emoji} ${esc(c.label)}` : ""; };
 const bothAnswered = qid => PEOPLE.every(p => answeredBy(entries, p, qid));
@@ -155,6 +156,7 @@ document.addEventListener("click", e => {
 function goldieeNudge() {
   const g = window.goldiee; if (!g) return;
   if (!KEY || !NAME) return g.say("this phone isn't set up to write yet 🔑", "./", "set it up →");
+  if (goldieeCry(allPages, "./")) return;
   const waiting = entries.find(e => e.prompt && !e.together && e.author !== NAME && !answeredBy(entries, NAME, e.prompt.id));
   if (waiting) return g.say(`${waiting.author} answered a question. Answer it too to see theirs 💭`, answerLink(waiting.prompt), "answer it →");
   const seen = Number(store.get("diary-seen-" + NAME)) || 0;
@@ -178,7 +180,10 @@ function renderProgress() {
   if (await initVault() === "locked") {
     await applyVaultKey(await Vault.lockScreen(VAULT, { title: "Mini games", hint: "Type our secret word to play." }));
   }
-  try { entries = (await loadIndex()).entries.filter(e => !e.status); } catch { entries = []; } // archived & binned pages stay out of the games
+  try { allPages = (await loadIndex()).entries; } catch {}
+  entries = allPages.filter(e => !e.status); // archived & binned pages stay out of the games
+  renderGoldieBar(allPages);
+  setInterval(() => renderGoldieBar(allPages), 60000);
   renderToday();
   setTimeout(goldieeNudge, 1500);
   renderMemoryIntro();

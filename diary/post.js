@@ -38,6 +38,11 @@ function renderPost() {
     if (!fileCache.has(e.media)) fileCache.set(e.media, fileFor(e.media, fileName(e, e.media)));
   }
   if (e.type === "note") a.push(`<button type="button" class="ghost" data-act="copy">📋 copy text</button>`);
+  // Spend goldies to put a picture on the love page's photo strip.
+  if (KEY && NAME && e.type === "photo" && !e.status) {
+    a.push(e.pin ? `<button type="button" class="ghost pinned" data-act="unpin">🏠 on the home screen · remove</button>`
+                 : `<button type="button" class="ghost" data-act="pin">🏠 add to home · ${Goldies.RULES.PIN_COST} 🪙</button>`);
+  }
   if (KEY) {
     if (!e.status) a.push(`<button type="button" class="ghost" data-act="archive">🗂 archive</button>`, `<button type="button" class="ghost" data-act="bin">🗑 remove</button>`);
     if (e.status === "archived") a.push(`<button type="button" class="ghost" data-act="wall">↩ back to the wall</button>`, `<button type="button" class="ghost" data-act="bin">🗑 move to bin</button>`);
@@ -155,6 +160,22 @@ $("#postBack").addEventListener("click", async ev => {
     if (act === "download") return downloadFile(e.media, fileName(e, e.media));
     if (act === "share") return shareFile(e.media, fileName(e, e.media));
     if (act === "copy") { await navigator.clipboard.writeText([e.title, e.text].filter(Boolean).join("\n\n")); return toast("Copied 📋"); }
+    if (act === "pin") {
+      const have = myPoints(entries), cost = Goldies.RULES.PIN_COST;
+      if (have < cost) return toast(`You need ${cost} goldies for this. You have ${have} 🪙`);
+      if (!confirm(`Spend ${cost} goldies to put this picture on the love page?`)) return;
+      const img = $("#postCard img");
+      const wide = !!(img && img.naturalWidth > img.naturalHeight);
+      entries = await updateIndex(list => list.map(x => x.id === e.id ? { ...x, pin: { by: NAME, at: nowIso(), wide } } : x), `${NAME} pinned a picture to the home screen`);
+      notifyPartner(`${NAME} pinned a picture to the home screen 🏠`, "It's in the photo strip on the love page now.");
+      render(); renderPost();
+      return toast(`On the home screen 🏠  −${cost} 🪙`);
+    }
+    if (act === "unpin") {
+      if (!confirm("Take this picture off the love page? The goldies aren't given back.")) return;
+      entries = await updateIndex(list => list.map(x => { if (x.id !== e.id) return x; const { pin, ...rest } = x; return { ...rest, pinHistory: [...(x.pinHistory || []), pin] }; }), "Unpin a picture");
+      render(); return renderPost();
+    }
     if (act === "archive") { await moveTo(e, "archived", "Archive a page"); toast("Moved to the archive 🗂"); return closeSheet($("#postBack")); }
     if (act === "bin") {
       if (!confirm(`Move this to the bin? It stays there for ${BIN_DAYS} days, then it's deleted for good.`)) return;
@@ -270,7 +291,10 @@ $("#replyForm").addEventListener("submit", async ev => {
       r.media = packed.path; r.mediaSha = res.content.sha;
       if (reply.voice) r.duration = Math.round(reply.duration);
     }
+    const before = myPoints(entries);
     entries = await updateIndex(list => list.map(x => x.id === e.id ? { ...x, replies: [...(x.replies || []), r] } : x), `A reply from ${NAME}`);
+    pointsToast(before, entries);
+    window.goldiee?.cry(Goldies.score(entries, NAME).crying);
     const theirs = (e.by || e.author) !== NAME;
     notifyPartner(`${NAME} replied to ${theirs ? "your" : "a"} ${kindOf(e)} 💬`, "Open the diary to see it.");
     replyText.value = ""; replyText.style.height = "";
