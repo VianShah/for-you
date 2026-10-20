@@ -1,7 +1,8 @@
 /* ==========================================================
    Puzzle race 🧩
-   One of you picks a picture from the diary and a bet; the other
-   accepts (or not). You each solve the exact same scrambled picture
+   One of you challenges the other for a bet; the other accepts (or
+   not). The picture is a surprise: the app picks one from the diary
+   and nobody sees it until they start. You each solve the exact same scrambled picture
    on your own phone, whenever suits you, and whoever is faster takes
    the bet from the other. Tap a piece, then tap where it goes.
    Saved in entries.json as
@@ -26,10 +27,18 @@ function raceScramble(id) {
 }
 
 /* ---------- the list ---------- */
-let raceDraft = null; // { photo, bet } while setting up a challenge
+let raceDraft = null; // { bet } while setting up a challenge
+// A surprise picture, preferring ones you haven't raced on yet.
+function surprisePhoto() {
+  const used = new Set(allPages.filter(e => e.type === "race").map(e => e.photo));
+  const all = racePhotos().map(p => p.media), fresh = all.filter(m => !used.has(m));
+  const pool = fresh.length ? fresh : all;
+  return pool[Math.random() * pool.length | 0];
+}
 function raceCard(e) {
   const opp = raceOpp(e), meDone = raceDone(e, NAME), oppDone = raceDone(e, opp);
-  const head = `<div class="race-head"><img ${imgSrcAttrs(e.photo)} alt=""><div><small>${e.by === NAME ? `you challenged ${esc(opp)}` : `${esc(e.by)} challenged you`}</small>
+  const seen = e.times?.[NAME]?.start || (meDone && oppDone); // the picture stays a surprise until you start
+  const head = `<div class="race-head">${seen ? `<img ${imgSrcAttrs(e.photo)} alt="">` : `<span class="race-mystery">?</span>`}<div><small>${e.by === NAME ? `you challenged ${esc(opp)}` : `${esc(e.by)} challenged you`}</small>
     <b>${esc(betLabel(e.bet))}</b></div></div>`;
   let body;
   if (!e.accepted) {
@@ -63,14 +72,12 @@ function renderRace() {
   else if (!raceDraft) start.innerHTML = `<div class="game-actions"><button class="save" id="raceNew">challenge ${esc(partnerOf(NAME))} 🧩</button></div>`;
   else {
     const opp = partnerOf(NAME), mine = myPoints(allPages), theirs = Goldies.score(allPages, opp).points;
-    start.innerHTML = `<div class="race-setup"><div class="label">pick a picture</div>
-      <div class="race-pics">${racePhotos().map(p => `<button type="button" class="${p.media === raceDraft.photo ? "on" : ""}" data-race-pic="${esc(p.media)}"><img ${imgSrcAttrs(p.media)} alt=""></button>`).join("")}</div>
-      <div class="label">play for</div><div class="choices">${Goldies.RULES.RACE_BETS.map(b => {
+    start.innerHTML = `<div class="race-setup"><div class="label">play for</div><div class="choices">${Goldies.RULES.RACE_BETS.map(b => {
         const ok = !b || (mine >= b && theirs >= b);
         return `<button type="button" class="choice${raceDraft.bet === b ? " on" : ""}" data-race-bet="${b}" ${ok ? "" : "disabled title=\"not enough goldies on both sides\""}>${esc(betLabel(b))}</button>`;
       }).join("")}</div>
-      <p class="hint">Winner takes the bet from the other. Nobody can bet goldies they don't have.</p>
-      <div class="game-actions"><button class="save" id="raceSend" ${raceDraft.photo ? "" : "disabled"}>send the challenge 💌</button><button class="ghost quiet-btn" id="raceCancelDraft">cancel</button></div></div>`;
+      <p class="hint">The picture is a surprise from the diary: neither of you sees it until you start. Winner takes the bet from the other. Nobody can bet goldies they don't have.</p>
+      <div class="game-actions"><button class="save" id="raceSend">send the challenge 💌</button><button class="ghost quiet-btn" id="raceCancelDraft">cancel</button></div></div>`;
   }
   hydrateMedia($("#race"));
 }
@@ -153,10 +160,8 @@ async function finishRace(result) {
 
 document.addEventListener("click", async ev => {
   const t = ev.target;
-  if (t.closest("#raceNew")) { raceDraft = { photo: null, bet: 0 }; return renderRace(); }
+  if (t.closest("#raceNew")) { raceDraft = { bet: 0 }; return renderRace(); }
   if (t.closest("#raceCancelDraft")) { raceDraft = null; return renderRace(); }
-  const pic = t.closest("[data-race-pic]");
-  if (pic) { raceDraft.photo = pic.dataset.racePic; return renderRace(); }
   const bet = t.closest("[data-race-bet]");
   if (bet && !bet.disabled) { raceDraft.bet = Number(bet.dataset.raceBet); return renderRace(); }
 
@@ -164,7 +169,7 @@ document.addEventListener("click", async ev => {
     const opp = partnerOf(NAME), b = raceDraft.bet;
     if (b && (myPoints(allPages) < b || Goldies.score(allPages, opp).points < b)) return toast("Not enough goldies for that bet.");
     t.closest("button").disabled = true;
-    const race = { id: gameId(), type: "race", by: NAME, with: opp, at: new Date().toISOString(), photo: raceDraft.photo, bet: b, times: {} };
+    const race = { id: gameId(), type: "race", by: NAME, with: opp, at: new Date().toISOString(), photo: surprisePhoto(), bet: b, times: {} };
     if (await gameSave(list => [race, ...list], `${NAME} challenged ${opp} to a puzzle race`, () => { raceDraft = null; renderRace(); })) {
       notifyPartner(`🧩 ${NAME} challenges you to a puzzle race`, b ? `${b} goldies on the line. Accept it in the mini games` : "Just for fun. Accept it in the mini games");
       toast(`Challenge sent to ${opp} 💌`);

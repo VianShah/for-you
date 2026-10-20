@@ -238,7 +238,6 @@ function openGoldieRules(list) {
       <li><b class="minus">−${R.PENALTY}</b> every ${R.GAP_MIN / 60} hours without posting or replying</li>
       <li><b>💤</b> sleep time, 1 am – 8:30 am: nothing counts (nothing lost, nothing earned)</li>
       <li><b>🧩</b> a puzzle race bet: the winner takes it from the other</li>
-      <li><b class="minus">−${R.BOOTH_COST}</b> open a photobooth 📸</li>
       <li><b class="minus">−${R.PIN_COST}</b> pin one of your pictures to the love page 🏠</li>
     </ul>
     <p class="help">Below 0, Goldiee starts crying 😢, and every 15 minutes (outside sleep time) the other one gets a ping about it. Each call is +${R.CALL} for every ${R.CALL_BLOCK_MIN} minutes together. The middle number counts the days in a row you <em>both</em> posted.</p>

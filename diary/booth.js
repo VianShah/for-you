@@ -1,4 +1,8 @@
 /* ==========================================================
+   PARKED: not loaded by any page right now. To bring it back, add
+   <script src="booth.js"></script> and the #booth section to games.html,
+   call renderBooth() in games.js, and charge BOOTH_COST in goldies.js.
+
    Photobooth 📸
    One of you opens a booth (costs goldies) and picks a backdrop. Each
    of you takes 4 shots on your own phone, whenever suits you. The phone

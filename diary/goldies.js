@@ -9,8 +9,7 @@
      game:  who knows whom: +5 answering about yourself, +20 spot-on guess,
             +10 close guess (paid when the guess is judged)
      race:  a puzzle race bet goes from the loser to the winner
-     spend: 200 to open a photobooth
-            100 to pin one of your pictures to the love page
+     spend: 100 to pin one of your pictures to the love page
    Works in the browser (window.Goldies) and in Node (globalThis.Goldies).
    ========================================================== */
 (() => {
@@ -23,10 +22,7 @@
     CALL: 5, CALL_BLOCK_MIN: 15,        // +5 for every 15 minutes on a call together
     KW_ANSWER: 5, KW_SPOT: 20, KW_CLOSE: 10, // "who knows whom": answering about yourself / a spot-on / a close guess
     PIN_COST: 100,
-    BOOTH_COST: 200,                    // one photobooth session, paid by whoever starts it
     RACE_BETS: [0, 50, 150],            // what a puzzle race can be played for (winner takes it from the loser)
-    // Goldies for trying the new games. Taken back once testing is done: delete this line.
-    TEST_GIFT: { Vian: 1000 },
     WELCOME: 50,                       // a starting gift, so one quiet morning doesn't make Goldiee cry
     CRY_BELOW: 0,                       // Goldiee cries when a score drops below this
   };
@@ -57,14 +53,13 @@
   // Every moment that earned someone points, oldest first.
   function events(entries, name) {
     const out = [{ at: START, pts: RULES.WELCOME, why: "a welcome gift from Goldiee", gift: true }];
-    if (RULES.TEST_GIFT?.[name]) out.push({ at: START, pts: RULES.TEST_GIFT[name], why: "testing goldies (Goldiee takes these back after testing)", gift: true });
     for (const e of entries || []) {
       const at = Date.parse(e.at);
       // A call counts for both of you; any call (even a short one) resets the 2.5-hour clock.
       if (e.type === "call") {
         if (at >= START && (e.by === name || e.with === name)) {
           const mins = Math.round((e.duration || 0) / 60);
-          out.push({ at: at + (e.duration || 0) * 1000, pts: Math.floor(mins / RULES.CALL_BLOCK_MIN) * RULES.CALL, why: `a ${mins} min ${e.kind === "audio" ? "call" : "FaceTime"}` });
+          out.push({ at: at + (e.duration || 0) * 1000, pts: Math.floor(mins / RULES.CALL_BLOCK_MIN) * RULES.CALL, why: `a ${mins} min ${e.kind === "audio" ? "call" : "FaceTime"}`, callStart: at });
         }
         continue;
       }
@@ -91,7 +86,8 @@
       }
     }
     // Sleep time doesn't count: things posted then still reset the clock, but earn nothing.
-    for (const x of out) if (!x.gift && !isAwake(x.at)) { x.pts = 0; x.why += " (sleep time)"; }
+    // A call that starts while you're awake counts in full, even if it runs on past 1 am.
+    for (const x of out) if (!x.gift && !isAwake(x.callStart ?? x.at)) { x.pts = 0; x.why += " (sleep time)"; }
     return out.sort((a, b) => a.at - b.at);
   }
 
@@ -106,8 +102,7 @@
       last = Math.max(last, t);
     }
     // Every pin ever made costs its goldies, even if the picture was taken off the home screen later.
-    const spent = (entries || []).flatMap(e => [e.pin, ...(e.pinHistory || [])]).filter(p => p && p.by === name).length * RULES.PIN_COST
-      + (entries || []).filter(e => e.type === "booth" && e.by === name && !e.cancelled).length * RULES.BOOTH_COST;
+    const spent = (entries || []).flatMap(e => [e.pin, ...(e.pinHistory || [])]).filter(p => p && p.by === name).length * RULES.PIN_COST;
     // Puzzle race bets move goldies straight from the loser to the winner (sleep time or not).
     const bets = races(entries).filter(r => r.bet && (r.winner === name || r.loser === name))
       .map(r => r.winner === name ? { at: r.at, pts: r.bet, why: "won a puzzle race 🧩" } : { at: r.at, pts: -r.bet, why: "lost a puzzle race 🧩" });

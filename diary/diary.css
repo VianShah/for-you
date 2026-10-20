@@ -294,6 +294,7 @@ textarea.field.hand { font-family: var(--hand); font-size: 24px; line-height: 1.
 .race-past .race-card, .kw-past .race-card { margin-top: 12px; box-shadow: none; border: 1px solid var(--line); }
 .race-head { display: flex; gap: 12px; align-items: center; }
 .race-head img { width: 56px; height: 56px; object-fit: cover; border-radius: 10px; flex: none; }
+.race-mystery { width: 56px; height: 56px; border-radius: 10px; flex: none; display: grid; place-items: center; font-family: var(--script); font-size: 40px; color: var(--cream); background: linear-gradient(135deg, var(--rose), var(--wine)); }
 .race-head small, .booth-card small { display: block; font-size: 11px; letter-spacing: .2em; text-transform: uppercase; color: var(--rose); margin-bottom: 4px; }
 .race-head b { font-family: var(--hand); font-weight: 400; font-size: 26px; }
 .race-card .hint { margin-top: 10px; }

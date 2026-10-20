@@ -190,9 +190,6 @@ function goldieeNudge() {
     (e.accepted ? !raceDone(e, NAME) : e.with === NAME));
   if (race) return g.say(race.accepted ? "your puzzle race is waiting 🧩" : `${race.by} challenged you to a puzzle race 🧩`,
     () => $("#race").scrollIntoView({ behavior: reduceMotion ? "auto" : "smooth" }), "take me →");
-  const booth = allPages.find(e => e.type === "booth" && !e.cancelled && e.by !== NAME && !boothHas(e, NAME));
-  if (booth) return g.say(`${partnerOf(NAME)} opened the photobooth 📸 take your ${BOOTH_SHOTS}?`,
-    () => $("#booth").scrollIntoView({ behavior: reduceMotion ? "auto" : "smooth" }), "take me →");
   const seen = Number(store.get("diary-seen-" + NAME)) || 0;
   const fresh = entries.filter(e => new Date(e.at).getTime() > seen && (e.by || e.author) !== NAME).length;
   if (fresh) return g.say(`${fresh} new ${fresh === 1 ? "page" : "pages"} from ${partnerOf(NAME)} in the diary 💌`, "./", "show me →");
@@ -200,7 +197,7 @@ function goldieeNudge() {
   if (!answeredBy(entries, NAME, tq.id)) return g.say("today's question is waiting for you ☀️", answerLink(tq), "answer it →");
 }
 
-/* ---------- saving from a game (who knows whom, puzzle race, photobooth) ---------- */
+/* ---------- saving from a game (who knows whom, puzzle race) ---------- */
 async function gameSave(change, message, render) {
   try {
     allPages = await updateIndex(change, message);
@@ -241,8 +238,7 @@ function renderProgress() {
   renderToday();
   renderKwho();
   renderRace();
-  renderBooth();
-  if (["#kwho", "#race", "#booth"].includes(location.hash)) $(location.hash).scrollIntoView();
+  if (["#kwho", "#race"].includes(location.hash)) $(location.hash).scrollIntoView();
   setTimeout(goldieeNudge, 1500);
   renderMemoryIntro();
   renderProgress();
