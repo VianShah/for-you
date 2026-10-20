@@ -108,6 +108,12 @@
   .vault-lock .vl-err { min-height: 20px; font-size: 14px; color: #b3263e; }
   .vault-lock.shake form { animation: vl-shake .45s; }
   @keyframes vl-shake { 20%, 60% { transform: translateX(-8px); } 40%, 80% { transform: translateX(8px); } }
+  :root[data-theme="dark"] .vault-lock { background: radial-gradient(ellipse at 50% 40%, #3a1a24, #161013 70%); color: #f2e4e7; }
+  :root[data-theme="dark"] .vault-lock h1 { color: #f2a7b1; }
+  :root[data-theme="dark"] .vault-lock .vl-eyebrow { color: #b79ca2; }
+  :root[data-theme="dark"] .vault-lock input { background: #1a1214; color: #f2e4e7; border-color: rgba(243,214,219,.2); }
+  :root[data-theme="dark"] .vault-lock button { background: #a33a55; color: #fff; }
+  :root[data-theme="dark"] .vault-lock .vl-err { color: #ff9aa8; }
   @media (prefers-reduced-motion: reduce) { .vault-lock, .vault-lock * { animation: none !important; transition: none !important; } }`;
   function lockScreen(vault, { title = "For your eyes only", hint = "Type our secret word to come in." } = {}) {
     return new Promise(resolve => {

@@ -7,6 +7,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,400;0,500;1,400;1,500&family=Pinyon+Script&family=Jost:wght@300;400&display=swap" rel="stylesheet">
+<script src="diary/theme.js"></script>
 <style>
   :root {
     --cream: #fbf5ef;
@@ -48,6 +49,25 @@
   .skip span { color: var(--muted); letter-spacing: .15em; text-transform: uppercase; font-size: 10px; margin-right: 4px; }
   .skip a { color: var(--wine); text-decoration: none; padding: 7px 12px; border-radius: 999px; white-space: nowrap; transition: background .2s; }
   .skip a:hover { background: var(--blush); }
+  .theme-toggle { border: none; background: none; font-size: 15px; width: 32px; height: 32px; border-radius: 50%; }
+  .theme-toggle:hover { background: var(--blush); }
+
+  /* ---------- dark mode: the colour tokens flip, plus a few things that sit on fixed colours ---------- */
+  :root[data-theme="dark"] {
+    color-scheme: dark;
+    --cream: #161013; --blush: #3a1a24; --ink: #f2e4e7; --muted: #b79ca2; --wine: #f2a7b1;
+  }
+  :root[data-theme="dark"] body::before { opacity: .15; }
+  :root[data-theme="dark"] .skip { background: rgba(34,23,25,.82); box-shadow: 0 6px 18px -8px #000; }
+  :root[data-theme="dark"] .words { background: #4a1626; color: #f7e7ea; }
+  :root[data-theme="dark"] .cursor.light { color: #f7e7ea; }
+  :root[data-theme="dark"] .things li { border-color: rgba(243,214,219,.12); }
+  :root[data-theme="dark"] .env-card p { color: #3a2026; }
+  :root[data-theme="dark"] .env-card .sign { color: #6e2337; }
+  :root[data-theme="dark"] .seal { background: #a33a55; color: #fbe1e4; }
+  :root[data-theme="dark"] .diary-link span { background: #a33a55; color: #fff; }
+  :root[data-theme="dark"] .frame .photo { box-shadow: 0 30px 60px -30px #000; }
+
   @media (max-width: 420px) { .skip span { display: none; } .skip { padding-left: 4px; } .skip a { padding: 7px 10px; } }
 
   /* ---------- intro ---------- */
@@ -208,6 +228,7 @@
   <span>skip to</span>
   <a href="diary/">📖 our diary</a>
   <a href="diary/games.html">🎲 mini games</a>
+  <button class="theme-toggle" data-theme-toggle aria-label="Switch theme">🌙</button>
 </nav>
 <div class="cursor" id="cursor"><svg viewBox="0 0 24 24"><path fill="currentColor" d="M12 21s-7.5-4.6-9.6-9.2C.9 8.4 3 4.5 6.7 4.5c2.1 0 3.6 1.2 4.3 2.4h2c.7-1.2 2.2-2.4 4.3-2.4 3.7 0 5.8 3.9 4.3 7.3C19.5 16.4 12 21 12 21z"/></svg></div>
 

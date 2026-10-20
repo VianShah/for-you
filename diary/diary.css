@@ -301,6 +301,60 @@ textarea.field.hand { font-family: var(--hand); font-size: 24px; line-height: 1.
   .section { padding: 8px 14px; font-size: 13px; }
 }
 
+/* ================= theme toggle button ================= */
+.theme-btn { position: absolute; right: 56px; top: 14px; }
+.games .theme-btn { right: 12px; }
+
+/* ================= dark mode =================
+   The page becomes a dark desk; scrapbook paper (notes, polaroids, question cards)
+   stays paper-coloured on top of it, so those keep their own dark ink. */
+:root[data-theme="dark"] { color-scheme: dark; }
+:root[data-theme="dark"] body {
+  color: #f2e4e7;
+  background:
+    radial-gradient(circle at 20% 10%, rgba(110,35,55,.35), transparent 45%),
+    radial-gradient(circle at 85% 60%, rgba(110,35,55,.25), transparent 50%),
+    #161013;
+}
+:root[data-theme="dark"] body::before { background-image: radial-gradient(rgba(243,214,219,.07) 1px, transparent 1.2px); }
+:root[data-theme="dark"] .card:not(.voice), :root[data-theme="dark"] .qcard { color: #3a2026; }
+:root[data-theme="dark"] .back, :root[data-theme="dark"] .eyebrow, :root[data-theme="dark"] .game-head p,
+:root[data-theme="dark"] .hint, :root[data-theme="dark"] .quiz-top, :root[data-theme="dark"] .jar-tap,
+:root[data-theme="dark"] .prog b, :root[data-theme="dark"] .help, :root[data-theme="dark"] .label,
+:root[data-theme="dark"] .status, :root[data-theme="dark"] .link-btn, :root[data-theme="dark"] .rec-time,
+:root[data-theme="dark"] .loading, :root[data-theme="dark"] .empty { color: #b79ca2; }
+:root[data-theme="dark"] .back:hover { color: #f2a7b1; }
+:root[data-theme="dark"] .top h1, :root[data-theme="dark"] .day-label, :root[data-theme="dark"] .empty b,
+:root[data-theme="dark"] .game h2, :root[data-theme="dark"] .sheet-head h2, :root[data-theme="dark"] .big-score,
+:root[data-theme="dark"] .icon-btn { color: #f2a7b1; }
+:root[data-theme="dark"] .day-label::after { background: rgba(243,214,219,.14); }
+:root[data-theme="dark"] .icon-btn:hover { background: rgba(243,214,219,.1); }
+:root[data-theme="dark"] .chip { background: rgba(34,23,25,.8); border-color: rgba(243,214,219,.16); color: #f2e4e7; }
+:root[data-theme="dark"] .chip.on, :root[data-theme="dark"] .choice.on { background: #a33a55; border-color: #a33a55; color: #fff; }
+:root[data-theme="dark"] .sections, :root[data-theme="dark"] .tabs { background: rgba(243,214,219,.08); }
+:root[data-theme="dark"] .section { color: #f2e4e7; }
+:root[data-theme="dark"] .section.on, :root[data-theme="dark"] .tab.on { background: #2c1e22; color: #f2a7b1; box-shadow: none; }
+:root[data-theme="dark"] .fab, :root[data-theme="dark"] .save, :root[data-theme="dark"] .unlock { background: #a33a55; color: #fff; }
+:root[data-theme="dark"] .sheet-back { background: rgba(0,0,0,.6); }
+:root[data-theme="dark"] .sheet, :root[data-theme="dark"] .sheet-foot { background: #221719; color: #f2e4e7; }
+:root[data-theme="dark"] .field, :root[data-theme="dark"] .choice, :root[data-theme="dark"] .drop,
+:root[data-theme="dark"] .ghost, :root[data-theme="dark"] .opt, :root[data-theme="dark"] .topic-row code {
+  background: #1a1214; border-color: rgba(243,214,219,.16); color: #f2e4e7; }
+:root[data-theme="dark"] .stickers button.on { background: #3a2229; }
+:root[data-theme="dark"] .rec-btn { background: #2c1e22; box-shadow: 0 0 0 6px #3a2229; }
+:root[data-theme="dark"] .prompt-banner { background: #3a2229; color: #f7d3d8; }
+:root[data-theme="dark"] .game { background: rgba(34,23,25,.85); border-color: rgba(243,214,219,.12); box-shadow: 0 20px 40px -30px #000; }
+:root[data-theme="dark"] .who-answered span { border-color: rgba(243,214,219,.2); color: #b79ca2; }
+:root[data-theme="dark"] .who-answered span.done { background: #3a2229; color: #f7d3d8; border-color: #c4566a; }
+:root[data-theme="dark"] .quiz h3, :root[data-theme="dark"] .memory-intro p { color: #f2e4e7; }
+:root[data-theme="dark"] .quiz blockquote { background: #2c1e22; color: #f2e4e7; }
+:root[data-theme="dark"] .opt.right { background: #1f3a26; border-color: #5aa66a; }
+:root[data-theme="dark"] .opt.wrong { background: #4a1f28; border-color: #d97b86; }
+:root[data-theme="dark"] .prog-bar { background: rgba(243,214,219,.1); }
+:root[data-theme="dark"] .jar-body { background: linear-gradient(90deg, rgba(255,255,255,.22), rgba(243,214,219,.1) 40%, rgba(255,255,255,.18)); border-color: rgba(243,214,219,.2); box-shadow: inset 0 0 20px rgba(255,255,255,.08); }
+:root[data-theme="dark"] .toast { background: #f2e4e7; color: #2b1a1e; }
+:root[data-theme="dark"] .cursor { color: #f2a7b1; }
+
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { animation: none !important; transition: none !important; }
 }

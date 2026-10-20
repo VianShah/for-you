@@ -28,6 +28,9 @@
   .goldiee-go { display: block; margin-top: 6px; font-family: "Jost", system-ui, sans-serif; font-size: 13px; color: #fff; background: #6e2337; border-radius: 999px; padding: 5px 12px; width: max-content; }
   .goldiee-x { position: absolute; top: 4px; right: 6px; border: none; background: none; color: #9a7a7f; font-size: 14px; padding: 4px; }
   @media (prefers-reduced-motion: reduce) { .goldiee, .goldiee * { animation: none !important; transition: none !important; } }
+  :root[data-theme="dark"] .goldiee-bubble { background: #2c1e22; color: #f2e4e7; border-color: rgba(243,214,219,.16); box-shadow: 0 10px 24px -12px #000; }
+  :root[data-theme="dark"] .goldiee-bubble b { color: #f2a7b1; }
+  :root[data-theme="dark"] .goldiee-go { background: #a33a55; }
   @media print { .goldiee { display: none; } }`;
 
   // A golden-retriever pup peeking over the edge: floppy ears, fluffy cheeks, little tongue, pink bow.
