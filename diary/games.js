@@ -181,7 +181,7 @@ function renderProgress() {
     await applyVaultKey(await Vault.lockScreen(VAULT, { title: "Mini games", hint: "Type our secret word to play." }));
   }
   try { allPages = (await loadIndex()).entries; } catch {}
-  entries = allPages.filter(e => !e.status); // archived & binned pages stay out of the games
+  entries = allPages.filter(e => !e.status && ["note", "photo", "voice"].includes(e.type)); // archived & binned pages (and calls) stay out of the games
   renderGoldieBar(allPages);
   setInterval(() => renderGoldieBar(allPages), 60000);
   renderToday();

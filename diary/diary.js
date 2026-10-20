@@ -67,7 +67,8 @@ function cardHtml(e) {
   const lock = locked ? `<button class="unlock" data-q="${esc(e.prompt.id)}">🔒 answer it too to see ${esc(e.author)}'s answer</button>` : "";
   const cls = locked ? " locked" : "";
   const common = `data-id="${esc(e.id)}" style="--r:${r}deg"`;
-  const top = `${del}${isNew}${stickersHtml(e)}${promptHtml(e)}`;
+  const hearts = e.hearts?.length ? `<span class="heart-badge" title="❤️ from ${esc(e.hearts.join(" & "))}">❤️${e.hearts.length > 1 ? " 2" : ""}</span>` : "";
+  const top = `${del}${hearts}${isNew}${stickersHtml(e)}${promptHtml(e)}`;
   if (e.type === "note") {
     const paper = ["lined", "sticky", "pink", "kraft", "letter"].includes(e.paper) ? e.paper : "lined";
     return `<article class="card note ${paper}${cls}" ${common}>${paper === "sticky" || paper === "pink" ? "" : tapeHtml(e)}${top}
@@ -91,7 +92,7 @@ function cardHtml(e) {
 }
 
 // The wall shows everything that isn't archived or in the recycle bin.
-const onWall = e => !e.status;
+const onWall = e => !e.status && ["note", "photo", "voice"].includes(e.type); // calls etc. live in their own widget
 function render() {
   const wall = entries.filter(onWall);
   const binned = entries.filter(e => e.status === "binned").length;
@@ -110,6 +111,7 @@ function render() {
       : [wall.length ? "Nothing here yet" : "The first page is waiting", KEY ? "tap ＋ to stick something in, or try the mini games for a question" : "open your setup link to start writing"];
     book.innerHTML = `<div class="empty"><b>${msg[0]}</b>${msg[1]}</div>`;
     renderGoldieBar(entries);
+  if (typeof renderCallWidget === "function") renderCallWidget();
     return;
   }
   const days = new Map();
@@ -119,6 +121,7 @@ function render() {
     days.get(d).push(e);
   }
   renderGoldieBar(entries);
+  if (typeof renderCallWidget === "function") renderCallWidget();
   book.innerHTML = [...days].map(([d, es]) =>
     `<section class="day"><div class="day-label">${esc(d)}</div><div class="grid">${es.map(cardHtml).join("")}</div></section>`
   ).join("");
@@ -199,7 +202,7 @@ book.addEventListener("click", ev => {
   const play = ev.target.closest("[data-play]");
   if (play) return togglePlay(play, entries.find(x => x.id === play.dataset.play)?.media);
   const card = ev.target.closest(".card");
-  if (card) openPost(card.dataset.id);
+  if (card) tapCard(card, ev); // one tap opens it, a double tap sends a ❤️
 });
 
 /* ---------- sheets ---------- */
@@ -245,6 +248,8 @@ function openSettings(msg = "", err = false) {
   $("#vaultOnBlock").hidden = !on;
   $("#forgetBtn").hidden = !on && !KEY;
   syncNotifyBlock();
+  $("#ftLabel").textContent = `${partnerOf(NAME || PEOPLE[0])}'s FaceTime`;
+  $("#ftInput").value = store.get("facetime-to");
   setStatus($("#settingsStatus"), msg, err);
   openSheet("#settingsBack");
 }
@@ -264,6 +269,7 @@ $("#settings").addEventListener("submit", async e => {
     KEY = key; store.set("diary-key", key);
   }
   NAME = pickedWho; store.set("diary-name", NAME);
+  store.set("facetime-to", $("#ftInput").value.trim()); // stays on this phone only
   setStatus(st, `All set, ${NAME} ♥`);
   syncFromLabel();
   render();
@@ -455,25 +461,38 @@ picker.addEventListener("click", e => {
 });
 
 /* photo: shrink to max 1600px so the repo stays light */
-async function shrinkImage(file, max = 1600) {
+// mirror: flip left↔right (for front-camera selfies that come out reversed)
+async function shrinkImage(file, max = 1600, mirror = false) {
   const url = URL.createObjectURL(file);
   try {
     const img = await new Promise((res, rej) => { const i = new Image(); i.onload = () => res(i); i.onerror = rej; i.src = url; });
     const scale = Math.min(1, max / Math.max(img.naturalWidth, img.naturalHeight));
     const c = document.createElement("canvas");
     c.width = Math.round(img.naturalWidth * scale); c.height = Math.round(img.naturalHeight * scale);
-    c.getContext("2d").drawImage(img, 0, 0, c.width, c.height);
+    const ctx = c.getContext("2d");
+    if (mirror) { ctx.translate(c.width, 0); ctx.scale(-1, 1); }
+    ctx.drawImage(img, 0, 0, c.width, c.height);
     return await new Promise(res => c.toBlob(res, "image/jpeg", 0.85));
   } finally { URL.revokeObjectURL(url); }
 }
 $("#photoInput").addEventListener("change", async e => {
   const file = e.target.files[0]; if (!file) return;
   try {
+    state.photoFile = file; state.mirror = false;
     state.photo = await shrinkImage(file);
+    $("#flipBtn").hidden = false;
     const prev = $("#photoPreview");
     prev.src = URL.createObjectURL(state.photo); prev.hidden = false;
     $("#dropText").hidden = true;
   } catch { toast("Couldn't open that picture. Try a JPG or PNG."); }
+});
+
+// ↔ flip the chosen picture before it's saved.
+$("#flipBtn").addEventListener("click", async () => {
+  if (!state.photoFile) return;
+  state.mirror = !state.mirror;
+  state.photo = await shrinkImage(state.photoFile, 1600, state.mirror);
+  $("#photoPreview").src = URL.createObjectURL(state.photo);
 });
 
 /* voice recording */
@@ -522,6 +541,7 @@ function resetComposer() {
   Object.assign(state, { stickers: [], photo: null, voice: null, voiceMime: "", duration: 0, prompt: null });
   $$("#stickerPicker button").forEach(b => b.classList.remove("on"));
   $("#photoPreview").hidden = true; $("#dropText").hidden = false; $("#photoInput").value = "";
+  state.photoFile = null; state.mirror = false; $("#flipBtn").hidden = true;
   recPreview.hidden = true; recTime.textContent = "tap to record";
 }
 

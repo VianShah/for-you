@@ -211,12 +211,13 @@ function fmtMins(m) { m = Math.max(0, Math.round(m)); return m >= 60 ? `${Math.f
 function renderGoldieBar(list) {
   const el = $("#goldieBar"); if (!el || !window.Goldies) return;
   const s = PEOPLE.map(p => Goldies.score(list, p));
-  const pill = x => `<span class="gp${x.name === NAME ? " me" : ""}${x.crying ? " sad" : ""}">${esc(x.name)} <b>🪙 ${x.points}</b>${x.crying ? " 😢" : ""}</span>`;
+  const side = x => `<span class="gb-side${x.name === NAME ? " me" : ""}${x.crying ? " sad" : ""}"><span class="gb-name">${esc(x.name)}${x.crying ? " · sad" : ""}</span><span class="gb-num">${x.points}</span></span>`;
   const mine = s.find(x => x.name === NAME);
   const hint = !mine ? "" : Goldies.isAwake(Date.now())
-    ? `your next −5 in ${fmtMins(mine.nextPenaltyIn)} · post or reply to reset it`
-    : "night time · no goldies lost while you sleep 🌙";
-  el.innerHTML = `${pill(s[0])}<span class="gstreak" title="days in a row you both posted">🔥 ${Goldies.streak(list, PEOPLE)}</span>${pill(s[1])}${hint ? `<small>${hint}</small>` : ""}`;
+    ? `next −5 in ${fmtMins(mine.nextPenaltyIn)}`
+    : "night · nothing lost while you sleep";
+  const st = Goldies.streak(list, PEOPLE);
+  el.innerHTML = `${side(s[0])}<span class="gb-mid" title="days in a row you both posted"><span class="gb-streak">${st}</span><span class="gb-lbl">day${st === 1 ? "" : "s"} together</span></span>${side(s[1])}${hint ? `<small class="gb-hint">goldies · ${hint}</small>` : ""}`;
   el.hidden = false;
   el.onclick = () => openGoldieRules(list);
 }
@@ -233,10 +234,11 @@ function openGoldieRules(list) {
       <li><b>+${R.VOICE}</b> a voice note</li>
       <li><b>+${R.LONG}</b> opening your heart (over ${R.LONG_CHARS} characters)</li>
       <li><b>+${R.PHOTO}</b> a picture</li>
-      <li><b class="minus">−${R.PENALTY}</b> every 2.5 hours without posting or replying (only ${R.AWAKE_FROM} am – ${R.AWAKE_TO - 12} pm)</li>
+      <li><b class="minus">−${R.PENALTY}</b> every ${R.GAP_MIN / 60} hours without posting or replying</li>
+      <li><b>💤</b> sleep time, 1 am – 8:30 am: nothing counts (nothing lost, nothing earned)</li>
       <li><b class="minus">−${R.PIN_COST}</b> pin one of your pictures to the love page 🏠</li>
     </ul>
-    <p class="help">Below 0, Goldiee starts crying 😢, and every 15 minutes the other one gets a ping about it. 🔥 counts the days in a row you <em>both</em> posted.</p>
+    <p class="help">Below 0, Goldiee starts crying 😢, and every 15 minutes (outside sleep time) the other one gets a ping about it. Each call is +${R.CALL} for every ${R.CALL_BLOCK_MIN} minutes together. The middle number counts the days in a row you <em>both</em> posted.</p>
     ${me ? `<div class="label">your last goldies</div><ul class="history">${hist || "<li>nothing yet, so go write something ♥</li>"}</ul>` : ""}</div>`;
   back.addEventListener("click", e => { if (e.target === back || e.target.closest("[data-close]")) back.remove(); });
   document.body.appendChild(back);

@@ -7,8 +7,8 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Caveat:wght@400;600&family=Cormorant+Garamond:ital,wght@0,400;0,500;1,400&family=Pinyon+Script&family=Jost:wght@300;400;500&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="diary.css?v=2026102102">
-<script src="theme.js?v=2026102102"></script>
+<link rel="stylesheet" href="diary.css?v=2026102103">
+<script src="theme.js?v=2026102103"></script>
 </head>
 <body>
 
@@ -27,7 +27,10 @@
     <a class="section on" href="./">📖 our diary</a>
     <a class="section" href="games.html">🎲 mini games</a>
   </nav>
-  <button type="button" class="goldie-bar" id="goldieBar" hidden aria-label="Goldie points"></button>
+  <div class="glass-dock">
+    <button type="button" class="goldie-bar" id="goldieBar" hidden aria-label="Goldie points"></button>
+    <div class="call-widget" id="callWidget" hidden></div>
+  </div>
   <nav class="filters" id="filters">
     <button class="chip on" data-f="all">everything</button>
     <button class="chip" data-f="note">✍️ notes</button>
@@ -88,6 +91,7 @@
         <span id="dropText">tap to choose a picture</span>
         <img id="photoPreview" alt="" hidden>
       </label>
+      <button type="button" class="flip-btn" id="flipBtn" hidden>↔ flip picture</button>
       <input class="field" name="caption" placeholder="A caption" maxlength="120">
       <div class="label">frame</div>
       <div class="choices" data-choice="frame">
@@ -162,6 +166,10 @@
       </details>
     </div>
 
+    <label class="label" id="ftLabel" for="ftInput">their FaceTime</label>
+    <input class="field" id="ftInput" placeholder="phone number or Apple ID email" autocomplete="off" inputmode="email">
+    <p class="help ft-help">For the 🎥 call button. It's saved on this phone only, never in the diary.</p>
+
     <div id="notifyBlock" hidden>
       <div class="label">notifications</div>
       <p class="help">To get a ping when the other one adds a page: install the free <b>ntfy</b> app (App Store / Play Store), tap ＋, and subscribe to this topic:</p>
@@ -209,12 +217,13 @@
   </div>
 </div>
 
-<script src="vault.js?v=2026102102"></script>
-<script src="goldies.js?v=2026102102"></script>
-<script src="core.js?v=2026102102"></script>
-<script src="questions.js?v=2026102102"></script>
-<script src="goldiee.js?v=2026102102"></script>
-<script src="diary.js?v=2026102102"></script>
-<script src="post.js?v=2026102102"></script>
+<script src="vault.js?v=2026102103"></script>
+<script src="goldies.js?v=2026102103"></script>
+<script src="core.js?v=2026102103"></script>
+<script src="questions.js?v=2026102103"></script>
+<script src="goldiee.js?v=2026102103"></script>
+<script src="diary.js?v=2026102103"></script>
+<script src="post.js?v=2026102103"></script>
+<script src="calls.js?v=2026102103"></script>
 </body>
 </html>

@@ -63,7 +63,8 @@ function replyHtml(r) {
   if (r.kind === "photo") media = `<img class="reply-img" ${imgSrcAttrs(r.media)} data-path="${esc(r.media)}" alt="a picture reply">`;
   if (r.kind === "voice") media = `<div class="reply-voice"><button type="button" class="play" data-rplay="${esc(r.media)}" aria-label="Play">▶</button><div class="bar"><i></i></div><span class="dur">${fmtDur(r.duration)}</span></div>`;
   const remove = mine && KEY ? ` · <button type="button" class="link-btn" data-rdel="${esc(r.id)}">remove</button>` : "";
-  return `<div class="reply ${mine ? "mine" : "theirs"}${isFresh(r.at, r.by) ? " fresh" : ""}">${media}${r.text ? `<p>${esc(r.text)}</p>` : ""}<small>${esc(r.by)} · ${when(r.at)}${remove}</small></div>`;
+  const heart = r.hearts?.length ? `<span class="reply-heart" title="❤️ from ${esc(r.hearts.join(" & "))}">❤️</span>` : "";
+  return `<div class="reply ${mine ? "mine" : "theirs"}${isFresh(r.at, r.by) ? " fresh" : ""}" data-rid="${esc(r.id)}">${heart}${media}${r.text ? `<p>${esc(r.text)}</p>` : ""}<small>${esc(r.by)} · ${when(r.at)}${remove}</small></div>`;
 }
 
 /* ---------- download & share ---------- */
@@ -135,12 +136,18 @@ async function emptyOldBin() {
 /* ---------- everything you can tap inside an open page ---------- */
 $("#postBack").addEventListener("click", async ev => {
   const e = entries.find(x => x.id === openId); if (!e) return;
+  const bubble = ev.target.closest(".reply"), onCard = ev.target.closest(".post-card .card");
+  const tapKey = bubble ? "r:" + bubble.dataset.rid : onCard ? "p:" + e.id : null;
+  if (tapKey && !ev.target.closest("button, a, audio")) {
+    if (isDoubleTap(tapKey)) { clearTimeout(tapTimer); return toggleHeart(e.id, bubble?.dataset.rid, ev.clientX, ev.clientY); }
+    const img = ev.target.closest(".post-card img, .reply-img");
+    if (img) { clearTimeout(tapTimer); tapTimer = setTimeout(() => openLightbox(img.src, img.dataset.path || e.media, fileName(e, img.dataset.path || e.media)), DOUBLE_TAP_MS); }
+    return;
+  }
   const play = ev.target.closest("[data-play]");
   if (play) return togglePlay(play, e.media);
   const rplay = ev.target.closest("[data-rplay]");
   if (rplay) return togglePlay(rplay, rplay.dataset.rplay);
-  const img = ev.target.closest(".post-card img, .reply-img");
-  if (img) return openLightbox(img.src, img.dataset.path || e.media, fileName(e, img.dataset.path || e.media));
 
   const rdel = ev.target.closest("[data-rdel]");
   if (rdel) {
@@ -189,6 +196,39 @@ $("#postBack").addEventListener("click", async ev => {
   } catch (err) { toast(err.message); }
 });
 
+/* ---------- double-tap ❤️ (pages and replies) ---------- */
+const DOUBLE_TAP_MS = 300;
+let tapTimer = null, lastTap = { key: null, t: 0 };
+function isDoubleTap(key) {
+  const now = Date.now(), dbl = lastTap.key === key && now - lastTap.t < DOUBLE_TAP_MS;
+  lastTap = dbl ? { key: null, t: 0 } : { key, t: now };
+  return dbl;
+}
+// On the wall a single tap opens the page, but waits a moment in case it's a double tap.
+function tapCard(card, ev) {
+  const id = card.dataset.id;
+  if (isDoubleTap("c:" + id)) { clearTimeout(tapTimer); return toggleHeart(id, null, ev.clientX, ev.clientY); }
+  clearTimeout(tapTimer);
+  tapTimer = setTimeout(() => openPost(id), DOUBLE_TAP_MS);
+}
+async function toggleHeart(eid, rid, x, y) {
+  if (!canWrite()) return;
+  const e = entries.find(z => z.id === eid); if (!e) return;
+  const target = rid ? (e.replies || []).find(r => r.id === rid) : e;
+  if (!target) return;
+  const adding = !(target.hearts || []).includes(NAME);
+  if (adding) { burst(x, y, 12); if (navigator.vibrate) navigator.vibrate(15); }
+  const flip = arr => (arr || []).includes(NAME) ? arr.filter(n => n !== NAME) : [...(arr || []), NAME];
+  try {
+    entries = await updateIndex(list => list.map(z => z.id !== eid ? z
+      : rid ? { ...z, replies: (z.replies || []).map(r => r.id === rid ? { ...r, hearts: flip(r.hearts) } : r) }
+      : { ...z, hearts: flip(z.hearts) }), adding ? `${NAME} ❤️ a ${rid ? "reply" : "page"}` : `${NAME} took back a ❤️`);
+    const owner = rid ? target.by : (target.by || target.author);
+    if (adding && owner !== NAME) notifyPartner(`${NAME} ❤️ your ${rid ? "reply" : kindOf(e)}`, "Open the diary to see it.");
+    render(); if (openId) renderPost();
+  } catch (err) { toast(err.message); }
+}
+
 /* ---------- lightbox, with download ---------- */
 let lbFile = null;
 function openLightbox(src, path, name) {
@@ -214,22 +254,29 @@ replyText.addEventListener("keydown", ev => {
 
 function showAttach() {
   const box = $("#replyAttach");
-  if (reply.photo) box.innerHTML = `<img src="${URL.createObjectURL(reply.photo)}" alt=""><span>picture</span><button type="button" class="link-btn" data-clear>✕</button>`;
+  if (reply.photo) box.innerHTML = `<img src="${URL.createObjectURL(reply.photo)}" alt=""><span>picture</span><button type="button" class="link-btn" data-flip>↔ flip</button><button type="button" class="link-btn" data-clear>✕</button>`;
   else if (reply.voice) box.innerHTML = `<audio controls src="${URL.createObjectURL(reply.voice)}"></audio><button type="button" class="link-btn" data-clear>✕</button>`;
   box.hidden = !(reply.photo || reply.voice);
 }
 function resetReply() {
-  Object.assign(reply, { photo: null, voice: null, voiceMime: "", duration: 0 });
+  Object.assign(reply, { photo: null, photoFile: null, mirror: false, voice: null, voiceMime: "", duration: 0 });
   $("#replyPhoto").value = "";
   $("#replyAttach").hidden = true; $("#replyAttach").innerHTML = "";
   setStatus($("#replyStatus"), "");
 }
-$("#replyAttach").addEventListener("click", ev => { if (ev.target.closest("[data-clear]")) resetReply(); });
+$("#replyAttach").addEventListener("click", async ev => {
+  if (ev.target.closest("[data-clear]")) return resetReply();
+  if (ev.target.closest("[data-flip]") && reply.photoFile) {
+    reply.mirror = !reply.mirror;
+    reply.photo = await shrinkImage(reply.photoFile, 1280, reply.mirror);
+    showAttach();
+  }
+});
 
 $("#replyPhoto").addEventListener("change", async ev => {
   const file = ev.target.files[0]; if (!file) return;
   stopReplyRecording();
-  try { reply.voice = null; reply.photo = await shrinkImage(file, 1280); showAttach(); }
+  try { reply.voice = null; reply.photoFile = file; reply.mirror = false; reply.photo = await shrinkImage(file, 1280); showAttach(); }
   catch { toast("Couldn't open that picture. Try a JPG or PNG."); }
 });
 
