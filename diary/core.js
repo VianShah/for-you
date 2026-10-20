@@ -234,6 +234,7 @@ function openGoldieRules(list) {
       <li><b>+${R.VOICE}</b> a voice note</li>
       <li><b>+${R.LONG}</b> opening your heart (over ${R.LONG_CHARS} characters)</li>
       <li><b>+${R.PHOTO}</b> a picture</li>
+      <li><b>+${R.KW_SPOT}</b> a spot-on guess in “who knows whom” (+${R.KW_CLOSE} if close, +${R.KW_ANSWER} for answering about yourself)</li>
       <li><b class="minus">−${R.PENALTY}</b> every ${R.GAP_MIN / 60} hours without posting or replying</li>
       <li><b>💤</b> sleep time, 1 am – 8:30 am: nothing counts (nothing lost, nothing earned)</li>
       <li><b class="minus">−${R.PIN_COST}</b> pin one of your pictures to the love page 🏠</li>

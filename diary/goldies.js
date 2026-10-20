@@ -6,6 +6,8 @@
      lose:  −5 for every 3.5 hours without posting or replying
      sleep: 1 am – 8:30 am (India time) nothing counts: nothing lost,
             nothing earned, no crying pings
+     game:  who knows whom: +5 answering about yourself, +20 spot-on guess,
+            +10 close guess (paid when the guess is judged)
      spend: 100 to pin one of your pictures to the love page
    Works in the browser (window.Goldies) and in Node (globalThis.Goldies).
    ========================================================== */
@@ -17,6 +19,7 @@
     GAP_MIN: 210, PENALTY: 5,           // −5 for every 3.5 awake hours without a post or reply
     TEXT: 5, VOICE: 5, LONG: 10, LONG_CHARS: 200, PHOTO: 15,
     CALL: 5, CALL_BLOCK_MIN: 15,        // +5 for every 15 minutes on a call together
+    KW_ANSWER: 5, KW_SPOT: 20, KW_CLOSE: 10, // "who knows whom": answering about yourself / a spot-on / a close guess
     PIN_COST: 100,
     WELCOME: 50,                        // a starting gift, so one quiet morning doesn't make Goldiee cry
     CRY_BELOW: 0,                       // Goldiee cries when a score drops below this
@@ -56,6 +59,15 @@
           const mins = Math.round((e.duration || 0) / 60);
           out.push({ at: at + (e.duration || 0) * 1000, pts: Math.floor(mins / RULES.CALL_BLOCK_MIN) * RULES.CALL, why: `a ${mins} min ${e.kind === "audio" ? "call" : "FaceTime"}` });
         }
+        continue;
+      }
+      // "Who knows whom" pays out once the guess is judged (skipped rounds pay nothing).
+      if (e.type === "kwho") {
+        const v = e.verdict, at = v && Date.parse(v.at);
+        if (!v || e.dropped || at < START) continue;
+        if (e.about === name) out.push({ at, pts: RULES.KW_ANSWER, why: "answering about yourself 🎯", game: true });
+        const pts = v.v === "spot" ? RULES.KW_SPOT : v.v === "close" ? RULES.KW_CLOSE : 0;
+        if (e.guess?.by === name && pts) out.push({ at, pts, why: v.v === "spot" ? "a spot-on guess 🎯" : "a close guess 👍", game: true });
         continue;
       }
       if (!PAGE_TYPES.includes(e.type)) continue;
@@ -101,7 +113,7 @@
 
   // Days in a row (India time) on which both of you posted or replied.
   function streak(entries, people, now = Date.now()) {
-    const days = people.map(p => new Set(events(entries, p).filter(x => !x.gift).map(x => localDay(x.at))));
+    const days = people.map(p => new Set(events(entries, p).filter(x => !x.gift && !x.game).map(x => localDay(x.at))));
     const both = d => days.every(s => s.has(d));
     let d = localDay(now);
     if (!both(d)) d -= 1; // today still counts until midnight

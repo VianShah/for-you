@@ -269,6 +269,26 @@ textarea.field.hand { font-family: var(--hand); font-size: 24px; line-height: 1.
 .qcard.flip { animation: flipin .6s cubic-bezier(.2,.7,.2,1) both; }
 @keyframes flipin { from { transform: perspective(800px) rotateX(-80deg) translateY(-30px); opacity: 0; } }
 
+/* who knows whom */
+.kw-score { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-bottom: 14px; }
+.kw-side { border: 1px dashed var(--line); border-radius: 14px; padding: 10px 12px; text-align: center; font-size: 13px; color: var(--muted); display: grid; gap: 4px; }
+.kw-side.me { border-style: solid; border-color: var(--rose); background: var(--blush); color: var(--wine); }
+.kw-side b { font-weight: 400; font-size: 14px; color: var(--ink); }
+.kw-list { display: grid; gap: 14px; }
+.kw-card { background: var(--paper); border-radius: 14px; padding: 18px; box-shadow: 0 14px 30px -18px rgba(110,35,55,.45); color: var(--ink); }
+.kw-card small { display: block; font-size: 11px; letter-spacing: .2em; text-transform: uppercase; color: var(--rose); margin-bottom: 6px; }
+.kw-card .kw-q { font-family: var(--hand); font-size: clamp(24px, 5vw, 30px); line-height: 1.2; margin-bottom: 12px; }
+.kw-card .field { margin-bottom: 0; }
+.kw-card .game-actions { margin-top: 12px; }
+.kw-card.new { width: 100%; background-color: #fff6d6; }
+.kw-bubble { background: rgba(110,35,55,.06); border-radius: 12px; padding: 10px 14px; margin-bottom: 8px; }
+.kw-bubble small { letter-spacing: .1em; margin-bottom: 2px; }
+.kw-bubble p { font-family: var(--hand); font-size: 22px; line-height: 1.25; }
+.kw-verdict { text-align: center; font-size: 18px; color: var(--wine); margin-top: 6px; }
+.kw-past { margin-top: 18px; }
+.kw-past summary { cursor: pointer; text-align: center; font-size: 14px; color: var(--muted); padding: 6px; }
+.kw-past .kw-card { margin-top: 12px; box-shadow: none; border: 1px solid var(--line); }
+#kwStart:empty { display: none; }
 .memory-intro { text-align: center; display: grid; gap: 14px; justify-items: center; }
 .memory-intro p { font-size: 15px; color: var(--ink); }
 .big-score { font-family: var(--script); font-size: 80px; line-height: 1; color: var(--wine); }
@@ -483,6 +503,13 @@ textarea.field.hand { font-family: var(--hand); font-size: 24px; line-height: 1.
 :root[data-theme="dark"] .opt.wrong { background: #4a1f28; border-color: #d97b86; }
 :root[data-theme="dark"] .prog-bar { background: rgba(243,214,219,.1); }
 :root[data-theme="dark"] .jar-body { background: linear-gradient(90deg, rgba(255,255,255,.22), rgba(243,214,219,.1) 40%, rgba(255,255,255,.18)); border-color: rgba(243,214,219,.2); box-shadow: inset 0 0 20px rgba(255,255,255,.08); }
+:root[data-theme="dark"] .kw-side { border-color: rgba(243,214,219,.2); color: #b79ca2; }
+:root[data-theme="dark"] .kw-side.me { background: #3a2229; color: #f7d3d8; border-color: #c4566a; }
+:root[data-theme="dark"] .kw-side b { color: #f2e4e7; }
+:root[data-theme="dark"] .kw-card .field { background: #fff; color: #3a2026; border-color: var(--line); }
+:root[data-theme="dark"] .kw-card { color: #3a2026; }
+:root[data-theme="dark"] .kw-card .hint { color: #9a7a7f; }
+:root[data-theme="dark"] .kw-past summary { color: #b79ca2; }
 :root[data-theme="dark"] .toast { background: #f2e4e7; color: #2b1a1e; }
 :root[data-theme="dark"] .cursor { color: #f2a7b1; }
 

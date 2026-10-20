@@ -183,6 +183,9 @@ function goldieeNudge() {
   if (goldieeCry(allPages, "./")) return;
   const waiting = entries.find(e => e.prompt && !e.together && e.author !== NAME && !answeredBy(entries, NAME, e.prompt.id));
   if (waiting) return g.say(`${waiting.author} answered a question. Answer it too to see theirs 💭`, answerLink(waiting.prompt), "answer it →");
+  const kw = kwWaitingOnMe()[0];
+  if (kw) return g.say(`your turn in who knows whom: ${{ answer: "answer about you", guess: "make a guess", judge: "judge the guess" }[kwMyTurn(kw)]} 🎯`,
+    () => $("#kwho").scrollIntoView({ behavior: reduceMotion ? "auto" : "smooth" }), "take me →");
   const seen = Number(store.get("diary-seen-" + NAME)) || 0;
   const fresh = entries.filter(e => new Date(e.at).getTime() > seen && (e.by || e.author) !== NAME).length;
   if (fresh) return g.say(`${fresh} new ${fresh === 1 ? "page" : "pages"} from ${partnerOf(NAME)} in the diary 💌`, "./", "show me →");
@@ -209,6 +212,8 @@ function renderProgress() {
   renderGoldieBar(allPages);
   setInterval(() => renderGoldieBar(allPages), 60000);
   renderToday();
+  renderKwho();
+  if (location.hash === "#kwho") $("#kwho").scrollIntoView();
   setTimeout(goldieeNudge, 1500);
   renderMemoryIntro();
   renderProgress();

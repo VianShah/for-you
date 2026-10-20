@@ -150,6 +150,10 @@ function goldieeNudge() {
   if (goldieeCry(entries, () => { state.prompt = null; openComposer(); })) return;
   const waiting = entries.find(isLocked);
   if (waiting) return g.say(`${waiting.author} answered a question. Answer it too to see theirs 💭`, () => startAnswer(waiting.prompt), "answer it →");
+  // A "who knows whom" round in the mini games waiting on this phone.
+  const kw = entries.find(e => e.type === "kwho" && !e.dropped && !e.verdict &&
+    (e.about === NAME ? !e.answer || e.guess : !e.guess));
+  if (kw) return g.say("your turn in who knows whom 🎯", "games.html#kwho", "play →");
   const replied = entries.find(e => onWall(e) && (e.replies || []).some(r => isFresh(r.at, r.by)));
   if (replied) return g.say(`${partnerOf(NAME)} replied to a page 💬`, () => openPost(replied.id), "read it →");
   const fresh = $$(".new-ribbon");
