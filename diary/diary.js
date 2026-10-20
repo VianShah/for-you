@@ -51,10 +51,18 @@ function isLocked(e) {
   return !!(NAME && e.prompt && !e.together && e.author !== NAME && !answeredBy(entries, NAME, e.prompt.id));
 }
 
+const isFresh = (at, by) => !!(NAME && at && new Date(at).getTime() > lastSeen && by !== NAME);
+const BIN_DAYS = 100;
+const binDaysLeft = e => Math.max(0, Math.ceil(BIN_DAYS - (Date.now() - new Date(e.binnedAt).getTime()) / 864e5));
+
 function cardHtml(e) {
   const r = (rand(e.id, "r") * 6 - 3).toFixed(2);
-  const del = KEY ? `<button class="del" data-del="${esc(e.id)}" aria-label="Remove this page">✕</button>` : "";
-  const isNew = NAME && e.at && new Date(e.at).getTime() > lastSeen && (e.by || e.author) !== NAME ? `<span class="new-ribbon">new</span>` : "";
+  // Replies live inside the post (tap it to see them); the wall only shows a small count.
+  const replies = e.replies || [];
+  const freshReply = replies.some(x => isFresh(x.at, x.by));
+  const del = replies.length ? `<span class="reply-badge${freshReply ? " fresh" : ""}">💬 ${replies.length}</span>` : "";
+  const binNote = e.status === "binned" ? `<div class="bin-note">🗑 deletes forever in ${binDaysLeft(e)} days</div>` : "";
+  const isNew = isFresh(e.at, e.by || e.author) ? `<span class="new-ribbon">new</span>` : "";
   const locked = isLocked(e);
   const lock = locked ? `<button class="unlock" data-q="${esc(e.prompt.id)}">🔒 answer it too to see ${esc(e.author)}'s answer</button>` : "";
   const cls = locked ? " locked" : "";
@@ -63,33 +71,44 @@ function cardHtml(e) {
   if (e.type === "note") {
     const paper = ["lined", "sticky", "pink", "kraft", "letter"].includes(e.paper) ? e.paper : "lined";
     return `<article class="card note ${paper}${cls}" ${common}>${paper === "sticky" || paper === "pink" ? "" : tapeHtml(e)}${top}
-      <div class="body">${e.title ? `<h3>${esc(e.title)}</h3>` : ""}<p>${esc(e.text)}</p>${guessHtml(e)}</div>${lock}${signHtml(e)}</article>`;
+      <div class="body">${e.title ? `<h3>${esc(e.title)}</h3>` : ""}<p>${esc(e.text)}</p>${guessHtml(e)}</div>${lock}${binNote}${signHtml(e)}</article>`;
   }
   if (e.type === "photo") {
     const frame = ["polaroid", "tape", "film", "heart", "stamp"].includes(e.frame) ? e.frame : "polaroid";
     const fcls = frame === "tape" ? "tape-frame" : frame;
     return `<article class="card photo ${fcls}${cls}" ${common}>${frame === "tape" ? tapeHtml(e, 2) : ""}${top}
       <div class="body"><div class="wrap"><img ${imgSrcAttrs(e.media)} alt="${esc(e.caption || "a picture of us")}" loading="lazy"></div>
-      ${e.caption ? `<div class="cap">${esc(e.caption)}</div>` : ""}${guessHtml(e)}</div>${lock}${signHtml(e)}</article>`;
+      ${e.caption ? `<div class="cap">${esc(e.caption)}</div>` : ""}${guessHtml(e)}</div>${lock}${binNote}${signHtml(e)}</article>`;
   }
   if (e.type === "voice") {
     return `<article class="card voice${cls}" ${common}>${top}
       <div class="body"><div class="label-strip">${esc(e.title || "a little voice note")}</div>
       <div class="reels"><span class="spool"></span><button class="play" data-play="${esc(e.id)}" aria-label="Play">▶</button>
         <div class="bar"><i></i></div><span class="dur">${fmtDur(e.duration)}</span><span class="spool"></span></div>${guessHtml(e)}</div>
-      ${lock}${signHtml(e)}</article>`;
+      ${lock}${binNote}${signHtml(e)}</article>`;
   }
   return "";
 }
 
+// The wall shows everything that isn't archived or in the recycle bin.
+const onWall = e => !e.status;
 function render() {
-  const list = entries.filter(e => filter === "all" || (filter === "answers" ? e.prompt : e.type === filter))
+  const wall = entries.filter(onWall);
+  const binned = entries.filter(e => e.status === "binned").length;
+  $("#binChip").textContent = binned ? `🗑 bin (${binned})` : "🗑 bin";
+  const list = entries.filter(e =>
+      filter === "archive" ? e.status === "archived"
+    : filter === "bin" ? e.status === "binned"
+    : onWall(e) && (filter === "all" || (filter === "answers" ? e.prompt : e.type === filter)))
     .sort((a, b) => new Date(b.at) - new Date(a.at));
-  $("#sub").textContent = entries.length
-    ? `${entries.length} ${entries.length === 1 ? "page" : "pages"} of us so far`
+  $("#sub").textContent = wall.length
+    ? `${wall.length} ${wall.length === 1 ? "page" : "pages"} of us so far`
     : "notes, pictures & voices, kept forever";
   if (!list.length) {
-    book.innerHTML = `<div class="empty"><b>${entries.length ? "Nothing here yet" : "The first page is waiting"}</b>${KEY ? "tap ＋ to stick something in, or try the mini games for a question" : "open your setup link to start writing"}</div>`;
+    const msg = filter === "archive" ? ["The archive is empty", "pages you archive rest here, off the wall"]
+      : filter === "bin" ? ["The bin is empty", `removed pages wait here for ${BIN_DAYS} days before they're gone for good`]
+      : [wall.length ? "Nothing here yet" : "The first page is waiting", KEY ? "tap ＋ to stick something in, or try the mini games for a question" : "open your setup link to start writing"];
+    book.innerHTML = `<div class="empty"><b>${msg[0]}</b>${msg[1]}</div>`;
     return;
   }
   const days = new Map();
@@ -109,6 +128,7 @@ async function refresh() {
     entries = (await loadIndex()).entries;
     lastSeen = Number(store.get("diary-seen-" + NAME)) || 0;
     render();
+    emptyOldBin();
     setTimeout(goldieeNudge, 1500);
     // Remember this visit a moment later, so the ribbons show this time but not next time.
     if (NAME) setTimeout(() => store.set("diary-seen-" + NAME, String(Date.now())), 1500);
@@ -124,6 +144,8 @@ function goldieeNudge() {
   if (!NAME) return g.say("whose phone is this? tell me so I sign your pages 🐾", () => openSettings("First, tap whose phone this is."), "choose →");
   const waiting = entries.find(isLocked);
   if (waiting) return g.say(`${waiting.author} answered a question. Answer it too to see theirs 💭`, () => startAnswer(waiting.prompt), "answer it →");
+  const replied = entries.find(e => onWall(e) && (e.replies || []).some(r => isFresh(r.at, r.by)));
+  if (replied) return g.say(`${partnerOf(NAME)} replied to a page 💬`, () => openPost(replied.id), "read it →");
   const fresh = $$(".new-ribbon");
   if (fresh.length) return g.say(`${fresh.length} new ${fresh.length === 1 ? "page" : "pages"} from ${partnerOf(NAME)} 💌`,
     () => fresh[0].closest(".card").scrollIntoView({ behavior: reduceMotion ? "auto" : "smooth", block: "center" }), "show me →");
@@ -139,58 +161,51 @@ $("#filters").addEventListener("click", e => {
   render();
 });
 
-/* ---------- voice playback + lightbox + delete (delegated) ---------- */
+/* ---------- voice playback (cards on the wall, in an open post, and voice replies) ---------- */
 const player = new Audio();
-let playingId = null;
+let playingBtn = null; // the ▶ button whose voice note is playing
 player.addEventListener("timeupdate", () => {
-  const card = playingId && $(`.card[data-id="${CSS.escape(playingId)}"]`);
-  if (card && player.duration) $(".bar i", card).style.width = (player.currentTime / player.duration * 100) + "%";
+  const bar = playingBtn?.closest(".card, .reply")?.querySelector(".bar i");
+  if (bar && player.duration) bar.style.width = (player.currentTime / player.duration * 100) + "%";
 });
 player.addEventListener("ended", stopPlaying);
 function stopPlaying() {
-  const card = playingId && $(`.card[data-id="${CSS.escape(playingId)}"]`);
-  if (card) { card.classList.remove("playing"); $(".play", card).textContent = "▶"; $(".bar i", card).style.width = "0"; }
-  playingId = null;
+  if (playingBtn) {
+    const holder = playingBtn.closest(".card, .reply");
+    holder?.classList.remove("playing");
+    playingBtn.textContent = "▶";
+    const bar = holder?.querySelector(".bar i"); if (bar) bar.style.width = "0";
+  }
+  playingBtn = null;
+}
+async function togglePlay(btn, path) {
+  if (playingBtn === btn) { player.pause(); return stopPlaying(); }
+  player.pause(); stopPlaying();
+  playingBtn = btn;
+  try { player.src = await playableUrl(path); } catch { toast("Couldn't open this voice note."); return stopPlaying(); }
+  player.play().catch(() => toast("This voice note can't play on this device."));
+  btn.textContent = "❚❚";
+  btn.closest(".card, .reply")?.classList.add("playing");
 }
 
-book.addEventListener("click", async ev => {
+// On the wall: ▶ plays, 🔒 answers, and tapping anywhere else on a card opens it.
+book.addEventListener("click", ev => {
   const unlock = ev.target.closest(".unlock");
   if (unlock) return startAnswer(questionById(unlock.dataset.q) || entries.find(x => x.prompt?.id === unlock.dataset.q)?.prompt);
   if (ev.target.closest(".card.locked")) return;
-
   const play = ev.target.closest("[data-play]");
-  if (play) {
-    const id = play.dataset.play;
-    if (playingId === id) { player.pause(); stopPlaying(); return; }
-    stopPlaying();
-    const e = entries.find(x => x.id === id);
-    playingId = id;
-    try { player.src = await playableUrl(e.media); } catch { toast("Couldn't open this voice note."); return stopPlaying(); }
-    player.play().catch(() => toast("This voice note can't play on this device."));
-    play.textContent = "❚❚";
-    play.closest(".card").classList.add("playing");
-    return;
-  }
-  const img = ev.target.closest(".photo img");
-  if (img) { const lb = $("#lightbox"); $("img", lb).src = img.src; lb.hidden = false; return; }
-
-  const del = ev.target.closest("[data-del]");
-  if (del) {
-    const e = entries.find(x => x.id === del.dataset.del);
-    if (!e || !confirm("Take this page out of the diary?")) return;
-    try {
-      entries = await updateIndex(list => list.filter(x => x.id !== e.id), `Remove a page from ${e.author || "us"}`);
-      render();
-      if (e.media && e.mediaSha) deleteFile(e.media, e.mediaSha, "Remove media").catch(() => {});
-      toast("Page removed");
-    } catch (err) { toast(err.message); }
-  }
+  if (play) return togglePlay(play, entries.find(x => x.id === play.dataset.play)?.media);
+  const card = ev.target.closest(".card");
+  if (card) openPost(card.dataset.id);
 });
-$("#lightbox").addEventListener("click", () => { $("#lightbox").hidden = true; });
 
 /* ---------- sheets ---------- */
 function openSheet(id) { $(id).hidden = false; }
-function closeSheet(back) { back.hidden = true; if (back.id === "composerBack") stopRecording(); }
+function closeSheet(back) {
+  back.hidden = true;
+  if (back.id === "composerBack") stopRecording();
+  if (back.id === "postBack") closePost();
+}
 $$(".sheet-back").forEach(back => {
   back.addEventListener("click", e => { if (e.target === back || e.target.closest("[data-close]")) closeSheet(back); });
 });
@@ -307,7 +322,7 @@ async function switchOnVault(pass) {
     }
     // 2. the love-page photos
     const pr = await fetch(API + "photos?ref=" + BRANCH, { headers: headers(), cache: "no-store" });
-    const photos = pr.ok ? (await pr.json()).filter(f => f.type === "file" && !f.name.endsWith(".enc") && Vault.mimeOf(f.name).startsWith("image/")) : [];
+    const photos = pr.ok ? (await pr.json()).filter(f => f.type === "file" && !f.name.endsWith(".enc") && /^(image|video)\//.test(Vault.mimeOf(f.name))) : [];
     for (const [i, f] of photos.entries()) {
       step(`Encrypting love-page photo ${i + 1} of ${photos.length}…`);
       const fr = await fetch(f.download_url);
@@ -437,17 +452,21 @@ picker.addEventListener("click", e => {
 });
 
 /* photo: shrink to max 1600px so the repo stays light */
-$("#photoInput").addEventListener("change", async e => {
-  const file = e.target.files[0]; if (!file) return;
+async function shrinkImage(file, max = 1600) {
+  const url = URL.createObjectURL(file);
   try {
-    const url = URL.createObjectURL(file);
     const img = await new Promise((res, rej) => { const i = new Image(); i.onload = () => res(i); i.onerror = rej; i.src = url; });
-    const scale = Math.min(1, 1600 / Math.max(img.naturalWidth, img.naturalHeight));
+    const scale = Math.min(1, max / Math.max(img.naturalWidth, img.naturalHeight));
     const c = document.createElement("canvas");
     c.width = Math.round(img.naturalWidth * scale); c.height = Math.round(img.naturalHeight * scale);
     c.getContext("2d").drawImage(img, 0, 0, c.width, c.height);
-    URL.revokeObjectURL(url);
-    state.photo = await new Promise(res => c.toBlob(res, "image/jpeg", 0.85));
+    return await new Promise(res => c.toBlob(res, "image/jpeg", 0.85));
+  } finally { URL.revokeObjectURL(url); }
+}
+$("#photoInput").addEventListener("change", async e => {
+  const file = e.target.files[0]; if (!file) return;
+  try {
+    state.photo = await shrinkImage(file);
     const prev = $("#photoPreview");
     prev.src = URL.createObjectURL(state.photo); prev.hidden = false;
     $("#dropText").hidden = true;

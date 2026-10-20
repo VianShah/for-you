@@ -73,7 +73,7 @@
     return { key, vault: { v: 1, kdf: "PBKDF2-SHA256", iter: ITER, salt, check: await encryptText(key, CHECK) } };
   }
 
-  const MIME = { jpg: "image/jpeg", jpeg: "image/jpeg", png: "image/png", webp: "image/webp", m4a: "audio/mp4", mp4: "audio/mp4", webm: "audio/webm", ogg: "audio/ogg" };
+  const MIME = { jpg: "image/jpeg", jpeg: "image/jpeg", png: "image/png", webp: "image/webp", m4a: "audio/mp4", mp4: "video/mp4", mov: "video/quicktime", webm: "audio/webm", ogg: "audio/ogg" };
   const mimeOf = path => MIME[(path.replace(/\.enc$/, "").split(".").pop() || "").toLowerCase()] || "application/octet-stream";
   const blobCache = new Map();
   // Fetches an encrypted file and hands back a local blob: URL to show or play it.

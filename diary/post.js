@@ -1,0 +1,282 @@
+/* One page, opened: replies (text, a voice note or a picture), download / share,
+   and archive / recycle bin. Replies are kept inside the page (entry.replies), so
+   they never stretch the wall; the wall only shows a small 💬 count.
+   Uses the helpers and state from core.js and diary.js. */
+let openId = null;
+const reply = { photo: null, voice: null, voiceMime: "", duration: 0 };
+const fileCache = new Map(); // path → Promise<File>, ready before the share sheet needs it
+const kindOf = e => e.prompt ? "answer" : e.type === "note" ? "note" : e.type === "photo" ? "picture" : "voice note";
+const newId = () => Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
+const when = at => new Date(at).toLocaleString("en-GB", { day: "numeric", month: "short", hour: "numeric", minute: "2-digit", hour12: true }).toLowerCase();
+const nowIso = () => new Date().toISOString();
+
+/* ---------- opening and drawing a page ---------- */
+function openPost(id) {
+  const e = entries.find(x => x.id === id); if (!e) return;
+  if (isLocked(e)) return startAnswer(e.prompt);
+  openId = id;
+  renderPost();
+  openSheet("#postBack");
+}
+function closePost() {
+  openId = null;
+  stopReplyRecording();
+  resetReply();
+  if (playingBtn?.closest("#postBack")) { player.pause(); stopPlaying(); }
+}
+
+function renderPost() {
+  const e = entries.find(x => x.id === openId);
+  if (!e) { $("#postBack").hidden = true; return closePost(); }
+  $("#postTitle").textContent = e.status === "binned" ? "In the bin" : e.status === "archived" ? "In the archive" : `${e.author}'s ${kindOf(e)}`;
+  $("#postCard").innerHTML = cardHtml(e);
+
+  const a = [];
+  if (e.media) {
+    a.push(`<button type="button" class="ghost" data-act="download">⬇ download</button>`);
+    if (navigator.share) a.push(`<button type="button" class="ghost" data-act="share">↗ share</button>`);
+    if (!fileCache.has(e.media)) fileCache.set(e.media, fileFor(e.media, fileName(e, e.media)));
+  }
+  if (e.type === "note") a.push(`<button type="button" class="ghost" data-act="copy">📋 copy text</button>`);
+  if (KEY) {
+    if (!e.status) a.push(`<button type="button" class="ghost" data-act="archive">🗂 archive</button>`, `<button type="button" class="ghost" data-act="bin">🗑 remove</button>`);
+    if (e.status === "archived") a.push(`<button type="button" class="ghost" data-act="wall">↩ back to the wall</button>`, `<button type="button" class="ghost" data-act="bin">🗑 move to bin</button>`);
+    if (e.status === "binned") a.push(`<button type="button" class="ghost" data-act="wall">↩ restore</button>`, `<button type="button" class="ghost danger" data-act="forever">✕ delete forever</button>`);
+  }
+  $("#postActions").innerHTML = a.join("");
+
+  const rs = e.replies || [];
+  $("#repliesLabel").textContent = rs.length ? `${rs.length} ${rs.length === 1 ? "reply" : "replies"}` : "no replies yet";
+  $("#replies").innerHTML = rs.map(replyHtml).join("");
+  $("#replyForm").hidden = !KEY || e.status === "binned";
+  hydrateMedia($("#postBack"));
+}
+
+function replyHtml(r) {
+  const mine = r.by === NAME;
+  let media = "";
+  if (r.kind === "photo") media = `<img class="reply-img" ${imgSrcAttrs(r.media)} data-path="${esc(r.media)}" alt="a picture reply">`;
+  if (r.kind === "voice") media = `<div class="reply-voice"><button type="button" class="play" data-rplay="${esc(r.media)}" aria-label="Play">▶</button><div class="bar"><i></i></div><span class="dur">${fmtDur(r.duration)}</span></div>`;
+  const remove = mine && KEY ? ` · <button type="button" class="link-btn" data-rdel="${esc(r.id)}">remove</button>` : "";
+  return `<div class="reply ${mine ? "mine" : "theirs"}${isFresh(r.at, r.by) ? " fresh" : ""}">${media}${r.text ? `<p>${esc(r.text)}</p>` : ""}<small>${esc(r.by)} · ${when(r.at)}${remove}</small></div>`;
+}
+
+/* ---------- download & share ---------- */
+function fileName(e, path) {
+  const ext = path.replace(/\.enc$/, "").split(".").pop();
+  return `${(e.author || "us").replace(/[^a-z0-9&]+/gi, "-")}-${new Date(e.at).toISOString().slice(0, 10)}.${ext}`;
+}
+async function fileFor(path, name) {
+  const blob = await (await fetch(await playableUrl(path))).blob(); // decrypted when the vault is on
+  return new File([blob], name, { type: Vault.mimeOf(path) });
+}
+async function downloadFile(path, name) {
+  try {
+    const f = await (fileCache.get(path) || fileFor(path, name));
+    const u = URL.createObjectURL(f);
+    const a = Object.assign(document.createElement("a"), { href: u, download: f.name });
+    document.body.appendChild(a); a.click(); a.remove();
+    setTimeout(() => URL.revokeObjectURL(u), 10000);
+    toast("Downloading ⬇");
+  } catch { toast("Couldn't download this one."); }
+}
+// On iPhone the share sheet has "Save Image", which puts it straight into Photos.
+async function shareFile(path, name) {
+  try {
+    const f = await (fileCache.get(path) || fileFor(path, name));
+    if (navigator.canShare?.({ files: [f] })) await navigator.share({ files: [f] });
+    else downloadFile(path, name);
+  } catch (err) { if (err.name !== "AbortError") toast("Couldn't share this one."); }
+}
+
+/* ---------- archive, recycle bin, delete forever ---------- */
+async function moveTo(e, status, message) {
+  entries = await updateIndex(list => list.map(x => {
+    if (x.id !== e.id) return x;
+    const { status: _s, archivedAt: _a, binnedAt: _b, ...rest } = x;
+    if (status === "archived") return { ...rest, status, archivedAt: nowIso() };
+    if (status === "binned") return { ...rest, status, binnedAt: nowIso() };
+    return rest; // back on the wall
+  }), message);
+  render();
+}
+function mediaOf(e) {
+  return [{ path: e.media, sha: e.mediaSha }, ...(e.replies || []).map(r => ({ path: r.media, sha: r.mediaSha }))].filter(m => m.path);
+}
+function deleteMediaOf(e) {
+  mediaOf(e).forEach(async m => {
+    const sha = m.sha || await shaOf(m.path);
+    if (sha) deleteFile(m.path, sha, "Delete a file for good").catch(() => {});
+  });
+}
+async function deleteForever(e) {
+  entries = await updateIndex(list => list.filter(x => x.id !== e.id), `Delete a page for good`);
+  deleteMediaOf(e);
+  render();
+}
+// Pages in the bin for 100 days are deleted for good, the next time either phone opens the diary.
+async function emptyOldBin() {
+  if (!KEY) return;
+  const expired = entries.filter(e => e.status === "binned" && binDaysLeft(e) === 0);
+  if (!expired.length) return;
+  const ids = new Set(expired.map(e => e.id));
+  try {
+    entries = await updateIndex(list => list.filter(x => !ids.has(x.id)), `Empty the bin (${BIN_DAYS} days)`);
+    expired.forEach(deleteMediaOf);
+    render();
+  } catch {}
+}
+
+/* ---------- everything you can tap inside an open page ---------- */
+$("#postBack").addEventListener("click", async ev => {
+  const e = entries.find(x => x.id === openId); if (!e) return;
+  const play = ev.target.closest("[data-play]");
+  if (play) return togglePlay(play, e.media);
+  const rplay = ev.target.closest("[data-rplay]");
+  if (rplay) return togglePlay(rplay, rplay.dataset.rplay);
+  const img = ev.target.closest(".post-card img, .reply-img");
+  if (img) return openLightbox(img.src, img.dataset.path || e.media, fileName(e, img.dataset.path || e.media));
+
+  const rdel = ev.target.closest("[data-rdel]");
+  if (rdel) {
+    if (!confirm("Remove this reply?")) return;
+    const r = (e.replies || []).find(x => x.id === rdel.dataset.rdel);
+    try {
+      entries = await updateIndex(list => list.map(x => x.id === e.id ? { ...x, replies: (x.replies || []).filter(y => y.id !== r.id) } : x), "Remove a reply");
+      if (r?.media) deleteMediaOf({ replies: [r] });
+      render(); renderPost();
+    } catch (err) { toast(err.message); }
+    return;
+  }
+
+  const act = ev.target.closest("[data-act]")?.dataset.act;
+  if (!act) return;
+  try {
+    if (act === "download") return downloadFile(e.media, fileName(e, e.media));
+    if (act === "share") return shareFile(e.media, fileName(e, e.media));
+    if (act === "copy") { await navigator.clipboard.writeText([e.title, e.text].filter(Boolean).join("\n\n")); return toast("Copied 📋"); }
+    if (act === "archive") { await moveTo(e, "archived", "Archive a page"); toast("Moved to the archive 🗂"); return closeSheet($("#postBack")); }
+    if (act === "bin") {
+      if (!confirm(`Move this to the bin? It stays there for ${BIN_DAYS} days, then it's deleted for good.`)) return;
+      await moveTo(e, "binned", "Move a page to the bin"); toast("Moved to the bin 🗑"); return closeSheet($("#postBack"));
+    }
+    if (act === "wall") { await moveTo(e, null, "Put a page back on the wall"); toast("Back on the wall ♥"); return renderPost(); }
+    if (act === "forever") {
+      if (!confirm("Delete this page forever? This can't be undone.")) return;
+      await deleteForever(e); toast("Deleted for good"); return closeSheet($("#postBack"));
+    }
+  } catch (err) { toast(err.message); }
+});
+
+/* ---------- lightbox, with download ---------- */
+let lbFile = null;
+function openLightbox(src, path, name) {
+  const lb = $("#lightbox");
+  $("img", lb).src = src;
+  lbFile = { path, name };
+  if (path && !fileCache.has(path)) fileCache.set(path, fileFor(path, name));
+  $("#lbShare").hidden = !navigator.share;
+  lb.hidden = false;
+}
+$("#lightbox").addEventListener("click", ev => {
+  if (ev.target.closest("#lbDownload")) return lbFile && downloadFile(lbFile.path, lbFile.name);
+  if (ev.target.closest("#lbShare")) return lbFile && shareFile(lbFile.path, lbFile.name);
+  $("#lightbox").hidden = true;
+});
+
+/* ---------- writing a reply ---------- */
+const replyText = $("#replyText");
+replyText.addEventListener("input", () => { replyText.style.height = "auto"; replyText.style.height = Math.min(replyText.scrollHeight, 140) + "px"; });
+replyText.addEventListener("keydown", ev => {
+  if (ev.key === "Enter" && !ev.shiftKey && matchMedia("(pointer: fine)").matches) { ev.preventDefault(); $("#replyForm").requestSubmit(); }
+});
+
+function showAttach() {
+  const box = $("#replyAttach");
+  if (reply.photo) box.innerHTML = `<img src="${URL.createObjectURL(reply.photo)}" alt=""><span>picture</span><button type="button" class="link-btn" data-clear>✕</button>`;
+  else if (reply.voice) box.innerHTML = `<audio controls src="${URL.createObjectURL(reply.voice)}"></audio><button type="button" class="link-btn" data-clear>✕</button>`;
+  box.hidden = !(reply.photo || reply.voice);
+}
+function resetReply() {
+  Object.assign(reply, { photo: null, voice: null, voiceMime: "", duration: 0 });
+  $("#replyPhoto").value = "";
+  $("#replyAttach").hidden = true; $("#replyAttach").innerHTML = "";
+  setStatus($("#replyStatus"), "");
+}
+$("#replyAttach").addEventListener("click", ev => { if (ev.target.closest("[data-clear]")) resetReply(); });
+
+$("#replyPhoto").addEventListener("change", async ev => {
+  const file = ev.target.files[0]; if (!file) return;
+  stopReplyRecording();
+  try { reply.voice = null; reply.photo = await shrinkImage(file, 1280); showAttach(); }
+  catch { toast("Couldn't open that picture. Try a JPG or PNG."); }
+});
+
+let rRecorder = null, rTimer = null, rStart = 0;
+$("#replyRec").addEventListener("click", async () => {
+  const btn = $("#replyRec");
+  if (rRecorder && rRecorder.state === "recording") return stopReplyRecording();
+  const mime = pickMime();
+  if (mime === null) return toast("This browser can't record audio.");
+  let stream;
+  try { stream = await navigator.mediaDevices.getUserMedia({ audio: true }); }
+  catch { return toast("Microphone permission is needed to record."); }
+  const chunks = [];
+  rRecorder = new MediaRecorder(stream, mime ? { mimeType: mime } : undefined);
+  rRecorder.ondataavailable = e => e.data.size && chunks.push(e.data);
+  rRecorder.onstop = () => {
+    stream.getTracks().forEach(t => t.stop());
+    clearInterval(rTimer);
+    btn.classList.remove("recording"); btn.textContent = "🎙";
+    if (!chunks.length) return;
+    reply.photo = null;
+    reply.voiceMime = (rRecorder.mimeType || mime || "audio/webm").split(";")[0];
+    reply.voice = new Blob(chunks, { type: reply.voiceMime });
+    reply.duration = (Date.now() - rStart) / 1000;
+    showAttach();
+  };
+  rRecorder.start();
+  rStart = Date.now();
+  btn.classList.add("recording");
+  rTimer = setInterval(() => {
+    const s = (Date.now() - rStart) / 1000;
+    btn.textContent = "■ " + fmtDur(s);
+    if (s >= MAX_VOICE_SECONDS) stopReplyRecording();
+  }, 250);
+});
+function stopReplyRecording() {
+  clearInterval(rTimer);
+  if (rRecorder && rRecorder.state === "recording") rRecorder.stop();
+}
+
+$("#replyForm").addEventListener("submit", async ev => {
+  ev.preventDefault();
+  const e = entries.find(x => x.id === openId); if (!e) return;
+  const text = replyText.value.trim();
+  if (!text && !reply.photo && !reply.voice) return;
+  if (!canWrite()) return;
+  const st = $("#replyStatus"), btn = $("#replySend");
+  btn.disabled = true;
+  try {
+    const r = { id: newId(), by: NAME, at: nowIso() };
+    if (text) r.text = text;
+    const blob = reply.photo || reply.voice;
+    if (blob) {
+      r.kind = reply.photo ? "photo" : "voice";
+      const ext = reply.photo ? "jpg" : ({ "audio/mp4": "m4a", "audio/ogg": "ogg" }[reply.voiceMime] || "webm");
+      setStatus(st, "Sending…");
+      const packed = await packMedia(`${MEDIA_DIR}${e.id}-r${r.id}.${ext}`, blob); // encrypted when the vault is on
+      const res = await putFile(packed.path, packed.b64, `A reply from ${NAME}`);
+      r.media = packed.path; r.mediaSha = res.content.sha;
+      if (reply.voice) r.duration = Math.round(reply.duration);
+    }
+    entries = await updateIndex(list => list.map(x => x.id === e.id ? { ...x, replies: [...(x.replies || []), r] } : x), `A reply from ${NAME}`);
+    const theirs = (e.by || e.author) !== NAME;
+    notifyPartner(`${NAME} replied to ${theirs ? "your" : "a"} ${kindOf(e)} 💬`, "Open the diary to see it.");
+    replyText.value = ""; replyText.style.height = "";
+    resetReply();
+    render(); renderPost();
+    const sheet = $(".post-sheet"); sheet.scrollTop = sheet.scrollHeight; // show the reply just sent
+  } catch (err) { setStatus(st, err.message, true); }
+  finally { btn.disabled = false; }
+});

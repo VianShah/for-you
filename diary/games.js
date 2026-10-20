@@ -178,7 +178,7 @@ function renderProgress() {
   if (await initVault() === "locked") {
     await applyVaultKey(await Vault.lockScreen(VAULT, { title: "Mini games", hint: "Type our secret word to play." }));
   }
-  try { entries = (await loadIndex()).entries; } catch { entries = []; }
+  try { entries = (await loadIndex()).entries.filter(e => !e.status); } catch { entries = []; } // archived & binned pages stay out of the games
   renderToday();
   setTimeout(goldieeNudge, 1500);
   renderMemoryIntro();

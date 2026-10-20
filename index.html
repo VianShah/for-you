@@ -7,7 +7,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,400;0,500;1,400;1,500&family=Pinyon+Script&family=Jost:wght@300;400&display=swap" rel="stylesheet">
-<script src="diary/theme.js"></script>
+<script src="diary/theme.js?v=2026102101"></script>
 <style>
   :root {
     --cream: #fbf5ef;
@@ -119,8 +119,11 @@
     background: linear-gradient(135deg, var(--blush), #e9c1bf);
   }
   .frame.wide .photo { width: clamp(300px, 46vw, 720px); height: clamp(260px, 48svh, 500px); }
-  .frame img { position: absolute; inset: 0; width: 120%; height: 100%; left: -10%; object-fit: cover; will-change: transform; transition: filter .6s; filter: saturate(.92); }
-  .frame:hover img { filter: saturate(1.08); }
+  .frame .m { position: absolute; inset: 0; width: 120%; height: 100%; left: -10%; object-fit: cover; will-change: transform; transition: filter .6s, opacity .9s ease; filter: saturate(.92); }
+  .frame .m.entering { opacity: 0; }
+  .frame .snd { position: absolute; z-index: 2; right: 10px; bottom: 10px; width: 36px; height: 36px; border-radius: 50%; border: none;
+    background: rgba(0,0,0,.45); color: #fff; font-size: 16px; backdrop-filter: blur(4px); -webkit-backdrop-filter: blur(4px); }
+  .frame:hover .m { filter: saturate(1.08); }
   .frame figcaption { margin-top: 18px; font-family: var(--serif); font-style: italic; font-size: 20px; color: var(--ink); }
   .frame figcaption b { display: block; font-family: var(--sans); font-style: normal; font-weight: 400; font-size: 11px; letter-spacing: .3em; color: var(--rose); margin-bottom: 4px; }
   .panel-end { flex: 0 0 auto; width: min(70vw, 380px); font-family: var(--script); font-size: clamp(40px, 5vw, 64px); color: var(--wine); line-height: 1.1; }
@@ -251,7 +254,7 @@
         <h2>A few of my <em>favourite</em> things</h2>
         <p>(all of them have you in them)</p>
       </div>
-      <!-- frames are inserted from the PHOTOS list in the script below -->
+      <!-- frames are inserted from the MEMORIES list in the script below -->
       <div class="panel-end" id="panelEnd">…and every<br>day still to come.</div>
     </div>
     <div class="gallery-count" id="count"></div>
@@ -311,69 +314,120 @@
 
 <footer>made with every bit of me</footer>
 
-<script src="diary/vault.js"></script>
+<script src="diary/vault.js?v=2026102101"></script>
 <script>
 /* ==========================================================
-   EDIT HERE: your photos + captions.
-   Put your pictures in the "photos" folder as 1.jpg, 2.jpg …
-   (or change the file names below). Until a photo exists,
-   a placeholder image is shown instead.
+   EDIT HERE: every memory the photo strip rotates through.
+   Pictures and videos live in the "photos" folder.
    wide: true  → landscape frame,  false → portrait frame
-   pos: which part of the photo stays in view ("50% 50%" = centre,
-        "50% 75%" = lower part) — handy for tall screenshots
+   pos: which part stays in view ("50% 50%" = centre)
+   The strip shows FRAME_SHAPES frames; every few seconds one of
+   the visible frames softly swaps to another memory of the same shape.
    ========================================================== */
-const PHOTOS = [
-  { src: "photos/1.jpg", tag: "BY THE SEA",     caption: "You, collecting us", wide: false },
-  { src: "photos/2.jpg", tag: "CENTRAL PERK",   caption: "Could I BE any luckier?", wide: true },
-  { src: "photos/3.jpg", tag: "THAT LOOK",      caption: "You know exactly which one", wide: false, pos: "50% 35%" },
-  { src: "photos/4.jpg", tag: "ORDINARY DAYS",  caption: "Dessert finished, hand still here", wide: false, pos: "50% 62%" },
-  { src: "photos/5.jpg", tag: "THE POUT",       caption: "Always ready, somehow", wide: true },
-  { src: "photos/6.png", tag: "FACETIME FACES", caption: "Even this one. Especially this one.", wide: false, pos: "50% 78%" },
-  { src: "photos/7.jpg", tag: "US",             caption: "My favourite place to sit", wide: false, pos: "50% 60%" },
-  { src: "photos/8.png", tag: "YOUR LAUGH",     caption: "My favourite view, even on a tiny screen", wide: false, pos: "50% 62%" },
+const MEMORIES = [
+  { src: "photos/1.jpg",  tag: "BY THE SEA",      caption: "You, collecting us", wide: false },
+  { src: "photos/2.jpg",  tag: "CENTRAL PERK",    caption: "Could I BE any luckier?", wide: true },
+  { src: "photos/3.jpg",  tag: "THAT LOOK",       caption: "You know exactly which one", wide: false, pos: "50% 35%" },
+  { src: "photos/4.jpg",  tag: "ORDINARY DAYS",   caption: "Dessert finished, hand still here", wide: false, pos: "50% 62%" },
+  { src: "photos/5.jpg",  tag: "THE POUT",        caption: "Always ready, somehow", wide: true },
+  { src: "photos/6.png",  tag: "FACETIME FACES",  caption: "Even this one. Especially this one.", wide: false, pos: "50% 78%" },
+  { src: "photos/v3.mp4", tag: "HUGS LIKE HOME",  caption: "The kind I never want to end", wide: true },
+  { src: "photos/7.jpg",  tag: "US",              caption: "My favourite place to sit", wide: false, pos: "50% 60%" },
+  { src: "photos/8.png",  tag: "YOUR LAUGH",      caption: "My favourite view, even on a tiny screen", wide: false, pos: "50% 62%" },
+  { src: "photos/9.jpg",  tag: "ELEVATOR EYES",   caption: "That smirk, every single time", wide: false, pos: "50% 40%" },
+  { src: "photos/19.jpg", tag: "FOUR EYES",       caption: "Two pairs of glasses, one big smile", wide: true, pos: "50% 40%" },
+  { src: "photos/10.jpg", tag: "MIRROR, MIRROR",  caption: "Bows on the case, kisses for the camera", wide: true },
+  { src: "photos/11.jpg", tag: "RED ROOM",        caption: "Serious face. I'm not fooled.", wide: true, pos: "50% 30%" },
+  { src: "photos/12.jpg", tag: "ONLY FOR ME",     caption: "Blurry, silly, perfect", wide: false, pos: "50% 45%" },
+  { src: "photos/13.jpg", tag: "NEW NAILS DAY",   caption: "The happiest little wiggle", wide: false, pos: "50% 40%" },
+  { src: "photos/14.jpg", tag: "MY SHOULDER",     caption: "Asleep on it, again", wide: false },
+  { src: "photos/15.jpg", tag: "DESSERT DATES",   caption: "You on your phone, me on you", wide: true },
+  { src: "photos/16.jpg", tag: "COFFEE RUNS",     caption: "One more, for us", wide: false, pos: "50% 55%" },
+  { src: "photos/17.jpg", tag: "UPSIDE DOWN",     caption: "Still the right way round with you", wide: false },
+  { src: "photos/18.jpg", tag: "PHOTO BOOTH",     caption: "Two faces, one frame", wide: true },
+  { src: "photos/20.jpg", tag: "CHEEK KISSES",    caption: "The wet, loud kind", wide: true },
+  { src: "photos/v1.mp4", tag: "OURS",            caption: "Just us, no one watching", wide: false },
+  { src: "photos/v2.mp4", tag: "GIGGLES",         caption: "Ceiling view, best view", wide: false },
 ];
+const FRAME_SHAPES = ["tall", "wide", "tall", "tall", "wide", "tall", "wide", "tall", "tall", "tall"];
+const ROTATE_EVERY = 5200; // ms between swaps
 
 const reduceMotion = matchMedia("(prefers-reduced-motion: reduce)").matches;
 const finePointer = matchMedia("(pointer: fine)").matches;
 const HEART_PATH = "M12 21s-7.5-4.6-9.6-9.2C.9 8.4 3 4.5 6.7 4.5c2.1 0 3.6 1.2 4.3 2.4h2c.7-1.2 2.2-2.4 4.3-2.4 3.7 0 5.8 3.9 4.3 7.3C19.5 16.4 12 21 12 21z";
 const COLORS = ["#d97b86", "#e8a0a8", "#6e2337", "#f3b6bd", "#c4566a"];
+const isVideo = m => /\.(mp4|mov|webm)$/i.test(m.src);
 
-/* ---------- build gallery ---------- */
+/* ---------- build the frames ---------- */
 const track = document.getElementById("track");
 const panelEnd = document.getElementById("panelEnd");
-const photoImgs = [];
-PHOTOS.forEach((p, i) => {
+const queues = { tall: MEMORIES.filter(m => !m.wide), wide: MEMORIES.filter(m => m.wide) };
+const nextMemory = shape => { const q = queues[shape]; const m = q.shift(); q.push(m); return m; };
+FRAME_SHAPES.forEach(shape => {
   const fig = document.createElement("figure");
-  fig.className = "frame" + (p.wide ? " wide" : "");
-  const img = new Image();
-  img.alt = p.caption;
-  img.loading = i < 2 ? "eager" : "lazy";
-  photoImgs.push([img, p, i]); // src is filled in by loadPhotos() below
-  if (p.pos) img.style.objectPosition = p.pos;
-  const box = document.createElement("div");
-  box.className = "photo";
-  box.appendChild(img);
-  const cap = document.createElement("figcaption");
-  cap.innerHTML = `<b>${String(i + 1).padStart(2, "0")} — ${p.tag}</b>${p.caption}`;
-  fig.append(box, cap);
+  fig.className = "frame" + (shape === "wide" ? " wide" : "");
+  fig.dataset.shape = shape;
+  fig.innerHTML = `<div class="photo"><button class="snd" hidden aria-label="Sound on">🔇</button></div><figcaption><b></b><span></span></figcaption>`;
   track.insertBefore(fig, panelEnd);
 });
 const frames = [...track.querySelectorAll(".frame")];
 
-/* ---------- photos: plain, or encrypted behind our secret word ---------- */
-(async function loadPhotos() {
+/* ---------- media: plain files, or decrypted behind our secret word ---------- */
+let vaultKey = null;
+async function mediaSrc(m) {
+  return vaultKey ? Vault.mediaUrl(vaultKey, m.src + ".enc", m.src) : m.src;
+}
+// Puts a memory into a frame, fading it in over whatever was there.
+async function show(fig, m, i, tries = 0) {
+  const box = fig.querySelector(".photo");
+  const video = isVideo(m);
+  const el = video ? document.createElement("video") : new Image();
+  if (video) { el.muted = true; el.loop = true; el.autoplay = true; el.playsInline = true; el.setAttribute("muted", ""); el.setAttribute("playsinline", ""); }
+  else el.alt = m.caption;
+  el.className = "m entering";
+  if (m.pos) el.style.objectPosition = m.pos;
+  const ready = () => {
+    const old = [...box.querySelectorAll(".m")].filter(x => x !== el);
+    setTimeout(() => el.classList.remove("entering"), 30);
+    setTimeout(() => old.forEach(o => { if (o.tagName === "VIDEO") o.pause(); o.remove(); }), 1000);
+    const snd = box.querySelector(".snd");
+    snd.hidden = !video; snd.textContent = "🔇";
+    fig.querySelector("figcaption b").textContent = `${String(i + 1).padStart(2, "0")} — ${m.tag}`;
+    fig.querySelector("figcaption span").textContent = m.caption;
+    onScroll();
+  };
+  el.addEventListener(video ? "loadeddata" : "load", ready, { once: true });
+  // A memory whose file isn't there (yet) is skipped quietly; the frame shows the next one.
+  const skip = () => { el.remove(); if (tries < queues[fig.dataset.shape].length) show(fig, nextMemory(fig.dataset.shape), i, tries + 1); };
+  el.addEventListener("error", skip, { once: true });
+  box.insertBefore(el, box.querySelector(".snd")); // on top of the old one, so it fades in over it
+  try { el.src = await mediaSrc(m); } catch { return skip(); }
+  if (video) el.play().catch(() => {});
+}
+// Tap a video's speaker to hear it.
+track.addEventListener("click", e => {
+  const b = e.target.closest(".snd"); if (!b) return;
+  const v = b.parentElement.querySelector("video.m");
+  if (!v) return;
+  v.muted = !v.muted; b.textContent = v.muted ? "🔇" : "🔊";
+});
+
+// Every few seconds, one frame that's on screen swaps to the next memory of its shape
+// (never one whose video someone is listening to).
+function rotate() {
+  if (document.hidden) return;
+  const onScreen = frames.filter(f => { const r = f.getBoundingClientRect(); return r.right > 0 && r.left < innerWidth && r.bottom > 0 && r.top < innerHeight; });
+  const pool = onScreen.filter(f => ![...f.querySelectorAll("video.m")].some(v => !v.muted));
+  if (!pool.length) return;
+  const fig = pool[Math.random() * pool.length | 0];
+  show(fig, nextMemory(fig.dataset.shape), frames.indexOf(fig));
+}
+
+(async function loadMemories() {
   const vault = window.Vault && await Vault.fetchVault("diary/vault.json");
-  if (!vault) {
-    photoImgs.forEach(([img, p, i]) => {
-      img.onerror = () => { img.onerror = null; img.src = `https://picsum.photos/seed/forher${i + 1}/900/1100`; };
-      img.src = p.src;
-    });
-    return;
-  }
-  const key = await Vault.cached(vault) || await Vault.lockScreen(vault, { title: "Hey you.", hint: "Type our secret word to come in." });
-  photoImgs.forEach(([img, p]) => {
-    Vault.mediaUrl(key, p.src + ".enc", p.src).then(u => { img.src = u; }).catch(() => { img.alt = "couldn't open this photo"; });
-  });
+  if (vault) vaultKey = await Vault.cached(vault) || await Vault.lockScreen(vault, { title: "Hey you.", hint: "Type our secret word to come in." });
+  frames.forEach((f, i) => show(f, nextMemory(f.dataset.shape), i));
+  setInterval(rotate, ROTATE_EVERY);
 })();
 const gallery = document.getElementById("gallery");
 const count = document.getElementById("count");
@@ -422,7 +476,7 @@ function onScroll() {
   frames.forEach((f, i) => {
     const r = f.getBoundingClientRect();
     const center = (r.left + r.width / 2) / innerWidth - .5; // -0.5 … 0.5 across the screen
-    f.querySelector("img").style.transform = `translate3d(${center * -12}%,0,0) scale(${1.05 - Math.abs(center) * .06})`;
+    f.querySelectorAll(".m").forEach(m => { m.style.transform = `translate3d(${center * -12}%,0,0) scale(${1.05 - Math.abs(center) * .06})`; });
     if (r.left < innerWidth * .6) active = i;
   });
   count.textContent = `${String(active + 1).padStart(2, "0")} / ${String(frames.length).padStart(2, "0")}`;
