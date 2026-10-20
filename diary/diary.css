@@ -289,6 +289,79 @@ textarea.field.hand { font-family: var(--hand); font-size: 24px; line-height: 1.
 .kw-past summary { cursor: pointer; text-align: center; font-size: 14px; color: var(--muted); padding: 6px; }
 .kw-past .kw-card { margin-top: 12px; box-shadow: none; border: 1px solid var(--line); }
 #kwStart:empty { display: none; }
+/* puzzle race */
+.race-card, .booth-card { background: var(--paper); border-radius: 14px; padding: 16px; box-shadow: 0 14px 30px -18px rgba(110,35,55,.45); color: var(--ink); }
+.race-past .race-card, .kw-past .race-card { margin-top: 12px; box-shadow: none; border: 1px solid var(--line); }
+.race-head { display: flex; gap: 12px; align-items: center; }
+.race-head img { width: 56px; height: 56px; object-fit: cover; border-radius: 10px; flex: none; }
+.race-head small, .booth-card small { display: block; font-size: 11px; letter-spacing: .2em; text-transform: uppercase; color: var(--rose); margin-bottom: 4px; }
+.race-head b { font-family: var(--hand); font-weight: 400; font-size: 26px; }
+.race-card .hint { margin-top: 10px; }
+.race-card .game-actions { margin-top: 12px; }
+.race-times { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-top: 12px; }
+.race-times span { border: 1px dashed var(--line); border-radius: 12px; padding: 8px; text-align: center; font-size: 13px; color: var(--muted); }
+.race-times span b { display: block; font-weight: 400; font-size: 20px; color: var(--ink); font-variant-numeric: tabular-nums; }
+.race-times span.win { border: 1px solid var(--rose); background: var(--blush); color: var(--wine); }
+.race-result { text-align: center; font-size: 17px; color: var(--wine); margin-top: 10px; }
+#raceStart, #boothStart { margin-top: 14px; }
+.race-setup { background: var(--paper); border-radius: 14px; padding: 16px; color: var(--ink); }
+.race-pics { display: grid; grid-template-columns: repeat(auto-fill, minmax(72px, 1fr)); gap: 8px; margin-bottom: 12px; }
+.race-pics button { padding: 0; border-radius: 10px; overflow: hidden; border: 3px solid transparent; aspect-ratio: 1; }
+.race-pics button.on { border-color: var(--wine); }
+.race-pics img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.choice:disabled { opacity: .4; }
+.race-sheet { width: min(520px, 100%); }
+.race-bar { display: flex; align-items: center; gap: 10px; margin-bottom: 12px; }
+.race-clock { font-size: 28px; font-variant-numeric: tabular-nums; color: var(--wine); }
+.race-moves { flex: 1; font-size: 13px; color: var(--muted); }
+.race-bar .ghost { padding: 8px 12px; }
+.race-board { display: grid; grid-template-columns: repeat(var(--n, 4), 1fr); gap: 2px; aspect-ratio: 1; background: var(--line); border-radius: 10px; overflow: hidden; margin-bottom: 10px; }
+.race-board.loading { display: grid; place-items: center; color: var(--muted); grid-template-columns: 1fr; }
+.piece { padding: 0; border-radius: 0; aspect-ratio: 1; background-repeat: no-repeat; transition: transform .12s, filter .2s; }
+.piece.picked { transform: scale(.9); outline: 3px solid var(--rose); outline-offset: -3px; z-index: 1; }
+.piece.fixed { filter: saturate(1.1); }
+.race-win { text-align: center; display: grid; gap: 10px; justify-items: center; margin-top: 8px; }
+.race-win p { font-size: 18px; color: var(--wine); }
+
+/* photobooth */
+.booth-card .who-answered { margin: 8px 0 0; }
+.booth-card .game-actions { margin-top: 12px; }
+.booth-bgs { display: grid; grid-template-columns: repeat(auto-fill, minmax(120px, 1fr)); gap: 8px; margin-bottom: 12px; }
+.booth-bgs button { padding: 0 0 6px; border-radius: 12px; overflow: hidden; border: 3px solid transparent; background: #fff; font-size: 12px; color: var(--ink); }
+.booth-bgs button.on { border-color: var(--wine); }
+.booth-bgs canvas { width: 100%; display: block; margin-bottom: 4px; }
+.booth-strips { display: flex; gap: 12px; overflow-x: auto; padding: 16px 2px 6px; }
+.booth-thumb { padding: 6px; background: #fff; border-radius: 6px; box-shadow: 0 10px 20px -12px rgba(110,35,55,.5); flex: none; transform: rotate(-2deg); }
+.booth-thumb:nth-child(even) { transform: rotate(2deg); }
+.booth-thumb img { width: 88px; display: block; }
+.booth-sheet { width: min(460px, 100%); }
+.cam-stage { position: relative; aspect-ratio: 3 / 4; border-radius: 14px; overflow: hidden; background: #1a1214; }
+.cam-stage video { width: 100%; height: 100%; object-fit: cover; transform: scaleX(-1); display: block; }
+.cam-stage.preview video { visibility: hidden; }
+.cam-preview { position: absolute; inset: 0; margin: auto; width: 100%; top: 50%; transform: translateY(-50%); height: auto; }
+.cam-count { position: absolute; inset: 0; display: grid; place-items: center; font-family: var(--script); font-size: 140px; color: #fff; text-shadow: 0 4px 20px rgba(0,0,0,.4); pointer-events: none; }
+.cam-count.pop { animation: pop .9s ease-out both; }
+@keyframes pop { from { transform: scale(1.6); opacity: 0; } 30% { opacity: 1; } to { transform: scale(.9); opacity: .2; } }
+.cam-flash { position: absolute; inset: 0; background: #fff; opacity: 0; pointer-events: none; }
+.cam-flash.go { animation: flash .5s ease-out; }
+@keyframes flash { from { opacity: .95; } to { opacity: 0; } }
+.cam-thumbs { display: grid; grid-template-columns: repeat(4, 1fr); gap: 6px; margin: 10px 0; }
+.cam-thumbs i { aspect-ratio: 3 / 4; border-radius: 8px; background: var(--line); overflow: hidden; cursor: pointer; }
+.cam-thumbs canvas { width: 100%; height: 100%; display: block; transform: none; }
+.booth-print { align-content: center; gap: 14px; }
+.printer { position: relative; width: min(300px, 80vw); }
+.printer-top { position: relative; z-index: 2; height: 74px; border-radius: 16px 16px 6px 6px; background: linear-gradient(#8d3049, #6e2337); color: #f7d3d8; font-family: var(--script); font-size: 34px; display: grid; place-items: center; box-shadow: 0 16px 30px -14px rgba(0,0,0,.6); }
+.printer-light { position: absolute; top: 12px; right: 14px; width: 9px; height: 9px; border-radius: 50%; background: #ffd27a; box-shadow: 0 0 8px #ffd27a; }
+.printer.whirr .printer-top { animation: whirr .12s linear infinite; }
+.printer.whirr .printer-light { animation: blink .5s steps(2) infinite; }
+@keyframes whirr { 50% { transform: translateX(1px); } }
+@keyframes blink { 50% { opacity: .2; } }
+.printer-slot { position: relative; z-index: 3; height: 10px; margin: -4px 18px 0; border-radius: 0 0 6px 6px; background: #2b1a1e; }
+.printer-out { display: flex; gap: 10px; justify-content: center; overflow: hidden; max-height: 62svh; margin-top: -2px; }
+.printer-out .printing { color: #f7d3d8; padding: 20px; }
+.printer-out .strip { width: 46%; max-height: 62svh; object-fit: contain; object-position: top; box-shadow: 0 10px 20px -10px rgba(0,0,0,.6); animation: printout 1.8s cubic-bezier(.3,.1,.3,1) both; }
+@keyframes printout { from { transform: translateY(-100%); } }
+.booth-print-actions .save { text-decoration: none; }
 .memory-intro { text-align: center; display: grid; gap: 14px; justify-items: center; }
 .memory-intro p { font-size: 15px; color: var(--ink); }
 .big-score { font-family: var(--script); font-size: 80px; line-height: 1; color: var(--wine); }
@@ -510,6 +583,12 @@ textarea.field.hand { font-family: var(--hand); font-size: 24px; line-height: 1.
 :root[data-theme="dark"] .kw-card { color: #3a2026; }
 :root[data-theme="dark"] .kw-card .hint { color: #9a7a7f; }
 :root[data-theme="dark"] .kw-past summary { color: #b79ca2; }
+:root[data-theme="dark"] .race-card, :root[data-theme="dark"] .booth-card, :root[data-theme="dark"] .race-setup { color: #3a2026; }
+:root[data-theme="dark"] .race-card .hint, :root[data-theme="dark"] .booth-card .hint, :root[data-theme="dark"] .race-setup .hint, :root[data-theme="dark"] .race-setup .label { color: #9a7a7f; }
+:root[data-theme="dark"] .race-setup .choice:not(.on) { background: #fff; color: #3a2026; border-color: var(--line); }
+:root[data-theme="dark"] .race-card .ghost, :root[data-theme="dark"] .booth-card .ghost, :root[data-theme="dark"] .race-setup .ghost { background: #fff; color: #3a2026; border-color: var(--line); }
+:root[data-theme="dark"] .race-clock { color: #f2a7b1; }
+:root[data-theme="dark"] .race-times span b { color: #3a2026; }
 :root[data-theme="dark"] .toast { background: #f2e4e7; color: #2b1a1e; }
 :root[data-theme="dark"] .cursor { color: #f2a7b1; }
 

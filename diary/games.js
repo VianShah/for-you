@@ -186,11 +186,38 @@ function goldieeNudge() {
   const kw = kwWaitingOnMe()[0];
   if (kw) return g.say(`your turn in who knows whom: ${{ answer: "answer about you", guess: "make a guess", judge: "judge the guess" }[kwMyTurn(kw)]} 🎯`,
     () => $("#kwho").scrollIntoView({ behavior: reduceMotion ? "auto" : "smooth" }), "take me →");
+  const race = allPages.find(e => e.type === "race" && !e.cancelled && (e.by === NAME || e.with === NAME) &&
+    (e.accepted ? !raceDone(e, NAME) : e.with === NAME));
+  if (race) return g.say(race.accepted ? "your puzzle race is waiting 🧩" : `${race.by} challenged you to a puzzle race 🧩`,
+    () => $("#race").scrollIntoView({ behavior: reduceMotion ? "auto" : "smooth" }), "take me →");
+  const booth = allPages.find(e => e.type === "booth" && !e.cancelled && e.by !== NAME && !boothHas(e, NAME));
+  if (booth) return g.say(`${partnerOf(NAME)} opened the photobooth 📸 take your ${BOOTH_SHOTS}?`,
+    () => $("#booth").scrollIntoView({ behavior: reduceMotion ? "auto" : "smooth" }), "take me →");
   const seen = Number(store.get("diary-seen-" + NAME)) || 0;
   const fresh = entries.filter(e => new Date(e.at).getTime() > seen && (e.by || e.author) !== NAME).length;
   if (fresh) return g.say(`${fresh} new ${fresh === 1 ? "page" : "pages"} from ${partnerOf(NAME)} in the diary 💌`, "./", "show me →");
   const tq = todaysQuestion(new Date(), allPages);
   if (!answeredBy(entries, NAME, tq.id)) return g.say("today's question is waiting for you ☀️", answerLink(tq), "answer it →");
+}
+
+/* ---------- saving from a game (who knows whom, puzzle race, photobooth) ---------- */
+async function gameSave(change, message, render) {
+  try {
+    allPages = await updateIndex(change, message);
+    entries = allPages.filter(e => !e.status && ["note", "photo", "voice"].includes(e.type));
+    renderGoldieBar(allPages);
+    if (render) render();
+    return true;
+  } catch (err) { toast(err.message); return false; }
+}
+const gameId = () => Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
+// An <img> ready to draw on a canvas (decrypted first if needed).
+async function loadImg(path) {
+  const img = new Image();
+  img.crossOrigin = "anonymous";
+  img.src = path.startsWith("blob:") || path.startsWith("data:") ? path : await playableUrl(path);
+  await img.decode();
+  return img;
 }
 
 /* ---------- progress ---------- */
@@ -213,7 +240,9 @@ function renderProgress() {
   setInterval(() => renderGoldieBar(allPages), 60000);
   renderToday();
   renderKwho();
-  if (location.hash === "#kwho") $("#kwho").scrollIntoView();
+  renderRace();
+  renderBooth();
+  if (["#kwho", "#race", "#booth"].includes(location.hash)) $(location.hash).scrollIntoView();
   setTimeout(goldieeNudge, 1500);
   renderMemoryIntro();
   renderProgress();

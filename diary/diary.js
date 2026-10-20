@@ -154,6 +154,10 @@ function goldieeNudge() {
   const kw = entries.find(e => e.type === "kwho" && !e.dropped && !e.verdict &&
     (e.about === NAME ? !e.answer || e.guess : !e.guess));
   if (kw) return g.say("your turn in who knows whom 🎯", "games.html#kwho", "play →");
+  const race = entries.find(e => e.type === "race" && !e.cancelled && (e.accepted ? (e.by === NAME || e.with === NAME) && !e.times?.[NAME] : e.with === NAME));
+  if (race) return g.say(race.accepted ? "your puzzle race is waiting 🧩" : `${race.by} challenged you to a puzzle race 🧩`, "games.html#race", "play →");
+  const booth = entries.find(e => e.type === "booth" && !e.cancelled && e.by !== NAME && !e.shots?.[NAME]);
+  if (booth) return g.say(`${booth.by} opened the photobooth 📸`, "games.html#booth", "take my 4 →");
   const replied = entries.find(e => onWall(e) && (e.replies || []).some(r => isFresh(r.at, r.by)));
   if (replied) return g.say(`${partnerOf(NAME)} replied to a page 💬`, () => openPost(replied.id), "read it →");
   const fresh = $$(".new-ribbon");

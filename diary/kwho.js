@@ -168,16 +168,11 @@ function renderKwho() {
 
 /* ---------- saving ---------- */
 async function kwSave(change, message, ok) {
-  try {
-    allPages = await updateIndex(change, message);
-    renderGoldieBar(allPages);
-    renderKwho();
-    if (ok) ok();
-    return true;
-  } catch (err) { toast(err.message); return false; }
+  const saved = await gameSave(change, message, renderKwho);
+  if (saved && ok) ok();
+  return saved;
 }
 const kwPart = text => ({ text, by: NAME, at: new Date().toISOString() });
-const kwId = () => Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
 const kwDoneToast = before => { const d = Goldies.score(allPages, NAME).points - before; if (d > 0) setTimeout(() => toast(`+${d} goldies 🪙`), 600); };
 
 document.addEventListener("click", async e => {
@@ -191,7 +186,7 @@ document.addEventListener("click", async e => {
     const text = $("#kwNewText").value.trim(); if (!text) return toast("Write something first ✍️");
     const b = t.closest("button"); b.disabled = true;
     const mine = kwDraft.about === NAME;
-    const round = { id: kwId(), type: "kwho", qid: kwDraft.qid, about: kwDraft.about, by: NAME, at: new Date().toISOString(), [mine ? "answer" : "guess"]: kwPart(text) };
+    const round = { id: gameId(), type: "kwho", qid: kwDraft.qid, about: kwDraft.about, by: NAME, at: new Date().toISOString(), [mine ? "answer" : "guess"]: kwPart(text) };
     const saved = await kwSave(list => [round, ...list], `${NAME} started a who-knows-whom round`, () => {
       notifyPartner(`🎯 ${NAME} wants to know who knows whom`, mine ? `Guess ${NAME}'s answer in the mini games` : `${NAME} guessed something about you. Answer it in the mini games`);
       toast(mine ? `Sent. Now ${partnerOf(NAME)} guesses 🎯` : `Locked in. Now ${partnerOf(NAME)} answers 🔒`);
