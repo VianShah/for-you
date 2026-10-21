@@ -243,4 +243,14 @@ function renderProgress() {
   setTimeout(goldieeNudge, 1500);
   renderMemoryIntro();
   renderProgress();
+  // New answers, turns and races show up by themselves (a quiz round in progress is left alone).
+  startAutoRefresh(list => {
+    allPages = list;
+    entries = allPages.filter(e => !e.status && ["note", "photo", "video", "voice"].includes(e.type));
+    renderGoldieBar(allPages);
+    renderToday();
+    renderKwho();
+    renderRace();
+    renderProgress();
+  }, allPages);
 })();

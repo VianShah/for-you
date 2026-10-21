@@ -143,6 +143,50 @@ async function loadIndex() {
   return { entries: await decodeIndex(data), sha: null };
 }
 
+/* ---------- auto refresh ---------- */
+// Every 15–25 seconds (and straight away when you come back to the page, e.g. from a
+// notification) the page checks for changes and redraws only if something changed.
+// GitHub answers "nothing new" (304) for free, so this barely touches the rate limit.
+// It waits while you're busy: writing, recording, playing something, or in a popup.
+let indexEtag = "", localIndexText = "";
+async function fetchIndexIfChanged() {
+  if (LOCAL) {
+    const r = await fetch("entries.json?t=" + Date.now(), { cache: "no-store" });
+    const text = await r.text();
+    if (!r.ok || text === localIndexText) return null;
+    localIndexText = text;
+    return decodeIndex(JSON.parse(text));
+  }
+  const h = headers();
+  if (indexEtag) h["If-None-Match"] = indexEtag;
+  const r = await fetch(API + INDEX + "?ref=" + BRANCH, { headers: h, cache: "no-store" });
+  if (r.status === 304 || !r.ok) return null;
+  indexEtag = r.headers.get("ETag") || "";
+  return decodeIndex(JSON.parse(fromB64((await r.json()).content)));
+}
+function pageBusy() {
+  if (document.hidden) return true;
+  if ($$(".sheet-back, .lightbox, .vault-lock").some(el => !el.hidden && el.isConnected && !el.matches("#postBack"))) return true; // an open page is fine, it refreshes too
+  if ($$("video, audio").some(m => !m.paused)) return true;
+  if ($$(".recording").length) return true;
+  // Something typed but not sent yet, anywhere on the page.
+  return $$("textarea, input[type=text], input:not([type])").some(el => el.value.trim() && el.offsetParent !== null) || document.activeElement?.matches?.("textarea, input");
+}
+function startAutoRefresh(apply, first) {
+  let last = JSON.stringify(first || []), running = false;
+  async function check() {
+    if (running || pageBusy()) return;
+    running = true;
+    try {
+      const list = await fetchIndexIfChanged();
+      const text = list && JSON.stringify(list);
+      if (list && text !== last) { last = text; apply(list); }
+    } catch {} finally { running = false; }
+  }
+  (function loop() { setTimeout(async () => { await check(); loop(); }, 15000 + Math.random() * 10000); })();
+  document.addEventListener("visibilitychange", () => { if (!document.hidden) setTimeout(check, 400); });
+}
+
 async function putFile(path, b64, message, sha) {
   const body = { message, content: b64, branch: BRANCH };
   if (sha) body.sha = sha;

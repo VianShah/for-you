@@ -166,6 +166,7 @@ function render() {
   hydrateMedia(book);
 }
 
+let autoRefreshOn = false;
 async function refresh() {
   try {
     entries = (await loadIndex()).entries;
@@ -173,6 +174,14 @@ async function refresh() {
     render();
     emptyOldBin();
     setTimeout(goldieeNudge, 1500);
+    if (!autoRefreshOn) {
+      autoRefreshOn = true;
+      startAutoRefresh(list => {
+        entries = list;
+        render();
+        if (openId && !$("#postBack").hidden) renderPost();
+      }, entries);
+    }
     // Remember this visit a moment later, so the ribbons show this time but not next time.
     if (NAME) setTimeout(() => store.set("diary-seen-" + NAME, String(Date.now())), 1500);
   } catch (e) {

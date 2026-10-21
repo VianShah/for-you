@@ -168,6 +168,7 @@ document.addEventListener("click", async ev => {
   renderGoldieBar(allPages);
   setInterval(() => renderGoldieBar(allPages), 60000);
   renderShop();
+  startAutoRefresh(list => { allPages = list; renderGoldieBar(allPages); renderShop(); }, allPages);
   if (location.hash) $(location.hash)?.scrollIntoView();
   const mine = NAME && openCoupons(allPages, NAME).filter(e => !e.done);
   if (mine?.length) setTimeout(() => goldiee.say(`${mine[0].by} sent you a love coupon 💌 make it happen?`, () => $("#coupons").scrollIntoView({ behavior: "smooth" }), "show me →"), 1500);
