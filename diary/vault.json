@@ -1,0 +1,8 @@
+{
+  "v": 1,
+  "kdf": "PBKDF2-SHA256",
+  "iter": 600000,
+  "salt": "f/DYRESCFvI0Gs/3TXTJag==",
+  "check": "hbfOrjxPBlb4ijJzxASM06YxYvbbyOE5/9d/SzyQFBDp7HbTM20=",
+  "secrets": "BFzdCHptii1F178DkWVz3Xo9f1p90MaZ2ORjNFQC/k+SqPb6GQkwHV1KP2V4vBlBajjM88K99S87f+e2+PF46c4Vf/lidSStkp8p6dKeie25ecXvxTtO1WErdjdObiN1TLwQ1BwcDCwe9URLvbE0nDbP6lD/+tgElg44bmIpOYYQt/AAX3FWsmDJPjTTjeGvqYsooehPdNy9mm+cN0iNfpPB1THiF7t/VOOO3stErr0bJyRcdOOg9j7tmcqwjaIZLq9hcUrpJwqK2HVQAo3KM9kmJVzVGvKkauQ="
+}
