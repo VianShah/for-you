@@ -3,7 +3,7 @@
    (and the reminder robot) always agree. Nothing is stored except the pages.
      earn:  note / text reply +5, voice +5, over 200 characters +10,
             picture +15  (pages written "together" count for both)
-     lose:  −5 for every 3.5 hours without posting or replying
+     lose:  −50 for every 3.5 hours without posting or replying
      sleep: 1 am – 8:30 am (India time) nothing counts: nothing lost,
             nothing earned, no crying pings
      game:  who knows whom: +5 answering about yourself, +20 spot-on guess,
@@ -17,7 +17,7 @@
     START: "2026-10-20T22:00:00+05:30", // points count from here, so nobody starts in the negative
     TZ_OFFSET_MIN: 330,                 // India time (UTC+5:30, no daylight saving)
     SLEEP_FROM: 60, SLEEP_TO: 510,      // sleep time 1:00 am – 8:30 am (minutes after midnight): nothing counts
-    GAP_MIN: 210, PENALTY: 5,           // −5 for every 3.5 awake hours without a post or reply
+    GAP_MIN: 210, PENALTY: 50,          // −50 for every 3.5 awake hours without a post or reply
     TEXT: 5, VOICE: 5, LONG: 10, LONG_CHARS: 200, PHOTO: 15,
     CALL: 5, CALL_BLOCK_MIN: 15,        // +5 for every 15 minutes on a call together
     KW_ANSWER: 5, KW_SPOT: 20, KW_CLOSE: 10, // "who knows whom": answering about yourself / a spot-on / a close guess
@@ -42,6 +42,33 @@
       t = dayStart + DAY;
     }
     return total;
+  }
+  // The same, to the millisecond (for the live countdown and the penalties).
+  function awakeMs(a, b) {
+    if (b <= a) return 0;
+    const off = RULES.TZ_OFFSET_MIN * MIN, D = DAY * MIN;
+    let t = a + off, total = b - a;
+    const end = b + off;
+    while (t < end) {
+      const dayStart = t - ((t % D) + D) % D;
+      const lo = Math.max(t, dayStart + RULES.SLEEP_FROM * MIN), hi = Math.min(end, dayStart + RULES.SLEEP_TO * MIN);
+      if (hi > lo) total -= hi - lo;
+      t = dayStart + D;
+    }
+    return total;
+  }
+  // The moment `ms` awake milliseconds after `from` (sleep time doesn't tick).
+  function addAwake(from, ms) {
+    const off = RULES.TZ_OFFSET_MIN * MIN, D = DAY * MIN;
+    let t = from, left = ms;
+    for (let guard = 0; left > 0 && guard < 400; guard++) {
+      const local = t + off, dayStart = local - ((local % D) + D) % D, m = local - dayStart;
+      if (m >= RULES.SLEEP_FROM * MIN && m < RULES.SLEEP_TO * MIN) { t = dayStart + RULES.SLEEP_TO * MIN - off; continue; }
+      const sleepAt = (m < RULES.SLEEP_FROM * MIN ? dayStart : dayStart + D) + RULES.SLEEP_FROM * MIN - off;
+      const step = Math.min(left, sleepAt - t);
+      t += step; left -= step;
+    }
+    return t;
   }
   const isAwake = ms => { const m = ((Math.floor(ms / MIN) + RULES.TZ_OFFSET_MIN) % DAY + DAY) % DAY; return !(m >= RULES.SLEEP_FROM && m < RULES.SLEEP_TO); };
   const localDay = ms => Math.floor((ms / MIN + RULES.TZ_OFFSET_MIN) / DAY);
@@ -94,12 +121,12 @@
   function score(entries, name, now = Date.now()) {
     const ev = events(entries, name);
     const earned = ev.reduce((s, x) => s + x.pts, 0);
-    // −5 for each full 2.5 awake hours between activities; any activity resets the clock.
+    // −50 for each full 3.5 awake hours between activities; any activity resets the clock.
     let lost = 0, last = START, penalties = [];
     for (const t of [...ev.map(x => x.at), now]) {
-      const blocks = Math.floor(awakeMinutes(last, Math.min(t, now)) / RULES.GAP_MIN);
+      const blocks = Math.floor(awakeMs(last, Math.min(t, now)) / (RULES.GAP_MIN * MIN));
       if (blocks > 0) { lost += blocks * RULES.PENALTY; penalties.push({ at: Math.min(t, now), pts: -blocks * RULES.PENALTY, why: `${blocks * RULES.GAP_MIN / 60} quiet hours` }); }
-      last = Math.max(last, t);
+      if (t < now) last = Math.max(last, t); // "now" isn't activity: the clock runs from the last real post
     }
     // Every pin ever made costs its goldies, even if the picture was taken off the home screen later.
     const spent = (entries || []).flatMap(e => [e.pin, ...(e.pinHistory || [])]).filter(p => p && p.by === name).length * RULES.PIN_COST;
@@ -107,13 +134,14 @@
     const bets = races(entries).filter(r => r.bet && (r.winner === name || r.loser === name))
       .map(r => r.winner === name ? { at: r.at, pts: r.bet, why: "won a puzzle race 🧩" } : { at: r.at, pts: -r.bet, why: "lost a puzzle race 🧩" });
     const won = bets.reduce((s, x) => s + x.pts, 0);
-    const sinceLast = awakeMinutes(last, now) % RULES.GAP_MIN;
+    const sinceLast = awakeMs(last, now) % (RULES.GAP_MIN * MIN);
     const points = earned - lost - spent + won;
     return {
       name, earned, lost, spent, won,
       points,
       crying: points < RULES.CRY_BELOW,
-      nextPenaltyIn: RULES.GAP_MIN - sinceLast, // awake minutes until the next −5
+      nextPenaltyIn: (RULES.GAP_MIN * MIN - sinceLast) / MIN, // awake minutes until the next −50
+      nextPenaltyAt: addAwake(now, RULES.GAP_MIN * MIN - sinceLast), // the moment it lands (sleep time pauses it)
       lastActive: ev.filter(x => !x.gift).pop()?.at ?? null,
       history: [...ev, ...penalties, ...bets].sort((a, b) => b.at - a.at),
     };
@@ -147,5 +175,5 @@
     return n;
   }
 
-  globalThis.Goldies = { RULES, awakeMinutes, isAwake, events, score, streak, textPoints, races };
+  globalThis.Goldies = { RULES, awakeMinutes, awakeMs, addAwake, isAwake, events, score, streak, textPoints, races };
 })();

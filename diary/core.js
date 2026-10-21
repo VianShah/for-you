@@ -201,26 +201,53 @@ async function packMedia(path, blob) {
 
 /* ---------- notifications ---------- */
 // Pings the other person's phone. Never blocks or breaks a save.
-function notifyPartner(title, message) {
+// Tapping it opens the page it was sent from (the diary, or the mini games), or `page` if given.
+function notifyPartner(title, message, page = /games\.html$/.test(location.pathname) ? "games.html" : "./") {
   const to = NAME && NOTIFY_TOPICS[partnerOf(NAME)];
   if (!to || LOCAL) return;
   fetch("https://ntfy.sh/", {
     method: "POST",
-    body: JSON.stringify({ topic: to, title, message, tags: ["love_letter"], click: new URL("./", location.href).href.replace(/games\.html$/, "") }),
+    body: JSON.stringify({ topic: to, title, message, tags: ["love_letter"], click: new URL(page, location.href).href }),
   }).catch(() => {});
 }
 
+/* ---------- "come and check" ping 🔔 ---------- */
+// A button on both pages: sends the other phone a notification that opens this page.
+const PING_GAP_MIN = 5; // so it can't be spammed
+function pingPartner() {
+  if (!NAME) return toast("Choose whose phone this is in ⚙ settings first.");
+  const left = PING_GAP_MIN * 60000 - (Date.now() - (Number(store.get("last-ping")) || 0));
+  if (left > 0) return toast(`You just pinged ${partnerOf(NAME)}. Try again in ${Math.ceil(left / 60000)} min ♥`);
+  if (!NOTIFY_TOPICS[partnerOf(NAME)]) return toast("Notifications aren't set up yet.");
+  const games = /games\.html$/.test(location.pathname);
+  notifyPartner(`🔔 ${NAME} wants you to come and check`, games ? "Open the mini games 🎲" : "Open the diary 💌");
+  store.set("last-ping", String(Date.now()));
+  toast(`Pinged ${partnerOf(NAME)} 🔔`);
+}
+document.addEventListener("click", e => { if (e.target.closest("[data-ping]")) pingPartner(); });
+
 /* ---------- goldie points 🪙 (rules live in goldies.js) ---------- */
 function fmtMins(m) { m = Math.max(0, Math.round(m)); return m >= 60 ? `${Math.floor(m / 60)}h ${m % 60}m` : `${m}m`; }
+// "2:14:07": awake time left before the next −50, ticking every second.
+function fmtLeft(ms) {
+  const s = Math.max(0, Math.ceil(ms / 1000));
+  return `${Math.floor(s / 3600)}:${String(Math.floor(s / 60) % 60).padStart(2, "0")}:${String(s % 60).padStart(2, "0")}`;
+}
+let goldieList = null;
+setInterval(() => {
+  const el = $(".gb-count"); if (!el || !window.Goldies) return;
+  const left = Goldies.awakeMs(Date.now(), Number(el.dataset.penaltyAt));
+  if (left <= 0) return renderGoldieBar(goldieList); // it landed: show the new score and start the next 3.5 hours
+  el.textContent = fmtLeft(left);
+}, 1000);
 function renderGoldieBar(list) {
   const el = $("#goldieBar"); if (!el || !window.Goldies) return;
   const s = PEOPLE.map(p => Goldies.score(list, p));
   const side = x => `<span class="gb-side${x.name === NAME ? " me" : ""}${x.crying ? " sad" : ""}"><span class="gb-name">${esc(x.name)}${x.crying ? " · sad" : ""}</span><span class="gb-num">${x.points}</span></span>`;
   const mine = s.find(x => x.name === NAME);
-  const hint = !mine ? "" : Goldies.isAwake(Date.now())
-    ? `next −5 in ${fmtMins(mine.nextPenaltyIn)}`
-    : "night · nothing lost while you sleep";
+  const hint = !mine ? "" : `−${Goldies.RULES.PENALTY} in <b class="gb-count" data-penalty-at="${mine.nextPenaltyAt}">${fmtLeft(Goldies.awakeMs(Date.now(), mine.nextPenaltyAt))}</b>${Goldies.isAwake(Date.now()) ? "" : " · paused, you're asleep 💤"}`;
   const st = Goldies.streak(list, PEOPLE);
+  goldieList = list;
   el.innerHTML = `${side(s[0])}<span class="gb-mid" title="days in a row you both posted"><span class="gb-streak">${st}</span><span class="gb-lbl">day${st === 1 ? "" : "s"} together</span></span>${side(s[1])}${hint ? `<small class="gb-hint">goldies · ${hint}</small>` : ""}`;
   el.hidden = false;
   el.onclick = () => openGoldieRules(list);

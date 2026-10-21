@@ -22,9 +22,10 @@ function renderCallWidget() {
   const all = calls.reduce((s, c) => s + (c.duration || 0), 0);
   const icon = d => `<svg viewBox="0 0 24 24" aria-hidden="true"><path d="${d}" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg>`;
   const VIDEO = "M3.5 7.5A1.5 1.5 0 0 1 5 6h8.5A1.5 1.5 0 0 1 15 7.5v9a1.5 1.5 0 0 1-1.5 1.5H5a1.5 1.5 0 0 1-1.5-1.5zM15 10.5l5.5-3v9l-5.5-3";
+  const BELL = "M6 16.5V11a6 6 0 0 1 12 0v5.5l1.5 2h-15zM10 20.5a2 2 0 0 0 4 0";
   const PHONE = "M6.6 3.5h2.6l1.4 3.8-1.9 1.2a11 11 0 0 0 6.8 6.8l1.2-1.9 3.8 1.4v2.6a1.6 1.6 0 0 1-1.7 1.6A16.5 16.5 0 0 1 5 5.2a1.6 1.6 0 0 1 1.6-1.7z";
   el.innerHTML = `<button type="button" class="cw-stats" data-calls><span class="cw-num">${fmtCallTime(week)}</span><span class="cw-lbl">on calls this week · ${fmtCallTime(all)} in all</span></button>
-    <div class="cw-btns"><button type="button" class="cw-btn" data-call="video" aria-label="FaceTime ${esc(partnerOf(NAME))}" title="FaceTime ${esc(partnerOf(NAME))}">${icon(VIDEO)}</button><button type="button" class="cw-btn" data-call="audio" aria-label="FaceTime audio" title="FaceTime audio">${icon(PHONE)}</button></div>`;
+    <div class="cw-btns"><button type="button" class="cw-btn" data-call="video" aria-label="FaceTime ${esc(partnerOf(NAME))}" title="FaceTime ${esc(partnerOf(NAME))}">${icon(VIDEO)}</button><button type="button" class="cw-btn" data-call="audio" aria-label="FaceTime audio" title="FaceTime audio">${icon(PHONE)}</button><button type="button" class="cw-btn" data-ping aria-label="Ping ${esc(partnerOf(NAME))} to come and check" title="Ping ${esc(partnerOf(NAME))} to come and check">${icon(BELL)}</button></div>`;
   el.hidden = false;
 }
 

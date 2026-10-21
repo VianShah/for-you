@@ -234,6 +234,7 @@ function renderProgress() {
   try { allPages = (await loadIndex()).entries; } catch {}
   entries = allPages.filter(e => !e.status && ["note", "photo", "voice"].includes(e.type)); // archived & binned pages (and calls) stay out of the games
   renderGoldieBar(allPages);
+  if (NAME) { $("#pingBtn").hidden = false; $("#pingBtn").textContent = `🔔 ping ${partnerOf(NAME)} to come and play`; }
   setInterval(() => renderGoldieBar(allPages), 60000);
   renderToday();
   renderKwho();
