@@ -75,7 +75,7 @@
 
   function textPoints(text) { return (text || "").trim().length > RULES.LONG_CHARS ? RULES.LONG : RULES.TEXT; }
   const credits = (e, name) => e.together ? true : (e.by || e.author) === name;
-  const PAGE_TYPES = ["note", "photo", "voice"];
+  const PAGE_TYPES = ["note", "photo", "video", "voice"];
 
   // Every moment that earned someone points, oldest first.
   function events(entries, name) {
@@ -101,15 +101,15 @@
       }
       if (!PAGE_TYPES.includes(e.type)) continue;
       if (at >= START && credits(e, name)) {
-        const pts = e.type === "photo" ? RULES.PHOTO : e.type === "voice" ? RULES.VOICE : textPoints(e.text);
-        const why = e.type === "photo" ? "a picture" : e.type === "voice" ? "a voice note" : pts === RULES.LONG ? "opening your heart" : e.prompt ? "an answer" : "a note";
+        const pts = e.type === "photo" || e.type === "video" ? RULES.PHOTO : e.type === "voice" ? RULES.VOICE : textPoints(e.text);
+        const why = e.type === "photo" ? "a picture" : e.type === "video" ? "a video" : e.type === "voice" ? "a voice note" : pts === RULES.LONG ? "opening your heart" : e.prompt ? "an answer" : "a note";
         out.push({ at, pts, why });
       }
       for (const r of e.replies || []) {
         const rat = Date.parse(r.at);
         if (rat < START || r.by !== name) continue;
-        const pts = r.kind === "photo" ? RULES.PHOTO : r.kind === "voice" ? RULES.VOICE : textPoints(r.text);
-        out.push({ at: rat, pts, why: r.kind === "photo" ? "a picture reply" : r.kind === "voice" ? "a voice reply" : "a reply" });
+        const pts = r.kind === "photo" || r.kind === "video" ? RULES.PHOTO : r.kind === "voice" ? RULES.VOICE : textPoints(r.text);
+        out.push({ at: rat, pts, why: r.kind === "photo" ? "a picture reply" : r.kind === "video" ? "a video reply" : r.kind === "voice" ? "a voice reply" : "a reply" });
       }
     }
     // Sleep time doesn't count: things posted then still reset the clock, but earn nothing.

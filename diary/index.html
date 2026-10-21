@@ -7,8 +7,8 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Caveat:wght@400;600&family=Cormorant+Garamond:ital,wght@0,400;0,500;1,400&family=Pinyon+Script&family=Jost:wght@300;400;500&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="diary.css?v=2026102111">
-<script src="theme.js?v=2026102111"></script>
+<link rel="stylesheet" href="diary.css?v=2026102112">
+<script src="theme.js?v=2026102112"></script>
 </head>
 <body>
 
@@ -87,9 +87,10 @@
     <!-- photo -->
     <section class="pane" data-pane="photo" hidden>
       <label class="drop" id="drop">
-        <input type="file" accept="image/*" id="photoInput" hidden>
-        <span id="dropText">tap to choose a picture</span>
+        <input type="file" accept="image/*,video/*" id="photoInput" hidden>
+        <span id="dropText">tap to choose a picture or a video</span>
         <img id="photoPreview" alt="" hidden>
+        <video id="videoPreview" controls playsinline muted hidden></video>
       </label>
       <button type="button" class="flip-btn" id="flipBtn" hidden>↔ flip picture</button>
       <input class="field" name="caption" placeholder="A caption" maxlength="120">
@@ -201,7 +202,7 @@
     <form class="reply-form" id="replyForm" autocomplete="off">
       <div class="reply-attach" id="replyAttach" hidden></div>
       <div class="reply-row">
-        <label class="reply-tool" title="Reply with a picture" aria-label="Reply with a picture">📷<input type="file" accept="image/*" id="replyPhoto" hidden></label>
+        <label class="reply-tool" title="Reply with a picture or a video" aria-label="Reply with a picture or a video">📷<input type="file" accept="image/*,video/*" id="replyPhoto" hidden></label>
         <button type="button" class="reply-tool" id="replyRec" title="Reply with a voice note" aria-label="Record a voice reply">🎙</button>
         <textarea class="field reply-text" id="replyText" rows="1" placeholder="write a reply…" maxlength="2000"></textarea>
         <button type="submit" class="reply-send" id="replySend" aria-label="Send reply">➤</button>
@@ -220,13 +221,13 @@
   </div>
 </div>
 
-<script src="vault.js?v=2026102111"></script>
-<script src="goldies.js?v=2026102111"></script>
-<script src="core.js?v=2026102111"></script>
-<script src="questions.js?v=2026102111"></script>
-<script src="goldiee.js?v=2026102111"></script>
-<script src="diary.js?v=2026102111"></script>
-<script src="post.js?v=2026102111"></script>
-<script src="calls.js?v=2026102111"></script>
+<script src="vault.js?v=2026102112"></script>
+<script src="goldies.js?v=2026102112"></script>
+<script src="core.js?v=2026102112"></script>
+<script src="questions.js?v=2026102112"></script>
+<script src="goldiee.js?v=2026102112"></script>
+<script src="diary.js?v=2026102112"></script>
+<script src="post.js?v=2026102112"></script>
+<script src="calls.js?v=2026102112"></script>
 </body>
 </html>

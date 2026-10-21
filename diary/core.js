@@ -180,8 +180,26 @@ const BLANK = "data:image/gif;base64,R0lGODlhAQABAAAAACH5BAEKAAEALAAAAAABAAEAAAI
 function imgSrcAttrs(path) {
   return path.endsWith(".enc") ? `src="${BLANK}" data-enc="${esc(path)}"` : `src="${esc(mediaUrl(path))}"`;
 }
+// A <video> for a page or reply; encrypted ones are filled in by hydrateMedia() too.
+function videoHtml(path, cls = "") {
+  return `<video class="${cls}" controls playsinline preload="metadata" ${path.endsWith(".enc") ? `data-enc="${esc(path)}"` : `src="${esc(mediaUrl(path))}#t=0.1"`}></video>`;
+}
+// Videos are big, so a page or reply takes one up to this size (about a minute of iPhone video).
+const VIDEO_MAX_MB = 40;
+const isVideoFile = f => /^video\//.test(f?.type || "") || /\.(mov|mp4|m4v)$/i.test(f?.name || "");
+const videoExt = f => ({ "video/quicktime": "mov", "video/mp4": "mp4", "video/x-m4v": "mp4" }[f.type] || (f.name.match(/\.(mov|mp4|m4v)$/i)?.[1] || "mp4").toLowerCase().replace("m4v", "mp4"));
+function videoTooBig(f) {
+  if (f.size <= VIDEO_MAX_MB * 1e6) return false;
+  toast(`That video is ${Math.round(f.size / 1e6)} MB. Keep it under ${VIDEO_MAX_MB} MB: trim it in Photos first (about a minute).`);
+  return true;
+}
 function hydrateMedia(root = document) {
   if (!CRYPTO_KEY) return;
+  $$("video[data-enc]", root).forEach(v => {
+    const path = v.dataset.enc;
+    v.removeAttribute("data-enc");
+    Vault.mediaUrl(CRYPTO_KEY, mediaUrl(path), path).then(u => { v.src = u + "#t=0.1"; }).catch(() => { v.replaceWith(Object.assign(document.createElement("p"), { className: "hint", textContent: "couldn't open this video" })); });
+  });
   $$("img[data-enc]", root).forEach(img => {
     const path = img.dataset.enc;
     img.removeAttribute("data-enc");
@@ -264,7 +282,7 @@ function openGoldieRules(list) {
       <li><b>+${R.TEXT}</b> a note or a text reply</li>
       <li><b>+${R.VOICE}</b> a voice note</li>
       <li><b>+${R.LONG}</b> opening your heart (over ${R.LONG_CHARS} characters)</li>
-      <li><b>+${R.PHOTO}</b> a picture</li>
+      <li><b>+${R.PHOTO}</b> a picture or a video</li>
       <li><b>+${R.KW_SPOT}</b> a spot-on guess in “who knows whom” (+${R.KW_CLOSE} if close, +${R.KW_ANSWER} for answering about yourself)</li>
       <li><b class="minus">−${R.PENALTY}</b> every ${R.GAP_MIN / 60} hours without posting or replying</li>
       <li><b>💤</b> sleep time, 1 am – 8:30 am: nothing counts (nothing lost, nothing earned)</li>

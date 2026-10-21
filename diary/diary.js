@@ -51,16 +51,26 @@ function isLocked(e) {
   return !!(NAME && e.prompt && !e.together && e.author !== NAME && !answeredBy(entries, NAME, e.prompt.id));
 }
 
+// When this phone last opened each page, so 💬 only shows for replies you haven't seen yet.
+// Replies from before this was added count as read.
+const readMap = () => { try { return JSON.parse(store.get("post-read") || "{}"); } catch { return {}; } };
+const READ_FROM = Number(store.get("post-read-from")) || (store.set("post-read-from", String(Date.now())), Date.now());
+function markRead(id) {
+  const m = readMap(); m[id] = Date.now();
+  const keep = Object.entries(m).sort((a, b) => b[1] - a[1]).slice(0, 300); // only the latest few hundred pages
+  store.set("post-read", JSON.stringify(Object.fromEntries(keep)));
+}
+const unreadReplies = e => !NAME ? 0 : (e.replies || []).filter(r => r.by !== NAME && Date.parse(r.at) > Math.max(readMap()[e.id] || 0, READ_FROM)).length;
 const isFresh = (at, by) => !!(NAME && at && new Date(at).getTime() > lastSeen && by !== NAME);
 const BIN_DAYS = 100;
 const binDaysLeft = e => Math.max(0, Math.ceil(BIN_DAYS - (Date.now() - new Date(e.binnedAt).getTime()) / 864e5));
 
-function cardHtml(e) {
+// full: the opened page (plays the video); on the wall a video is just a tile until you open it.
+function cardHtml(e, full = false) {
   const r = (rand(e.id, "r") * 6 - 3).toFixed(2);
-  // Replies live inside the post (tap it to see them); the wall only shows a small count.
-  const replies = e.replies || [];
-  const freshReply = replies.some(x => isFresh(x.at, x.by));
-  const del = replies.length ? `<span class="reply-badge${freshReply ? " fresh" : ""}">💬 ${replies.length}</span>` : "";
+  // Replies live inside the post (tap it to see them); the wall only shows how many are new.
+  const unread = unreadReplies(e);
+  const del = unread ? `<span class="reply-badge fresh" title="${unread} new ${unread === 1 ? "reply" : "replies"}">💬 ${unread}</span>` : "";
   const binNote = e.status === "binned" ? `<div class="bin-note">🗑 deletes forever in ${binDaysLeft(e)} days</div>` : "";
   const isNew = isFresh(e.at, e.by || e.author) ? `<span class="new-ribbon">new</span>` : "";
   const locked = isLocked(e);
@@ -81,6 +91,15 @@ function cardHtml(e) {
       <div class="body"><div class="wrap"><img ${e.previewSrc ? `src="${e.previewSrc}"` : imgSrcAttrs(e.media)} alt="${esc(e.caption || "a picture of us")}" loading="lazy"></div>
       ${e.caption ? `<div class="cap">${esc(e.caption)}</div>` : ""}${guessHtml(e)}</div>${lock}${binNote}${signHtml(e)}</article>`;
   }
+  if (e.type === "video") {
+    const frame = ["polaroid", "tape", "film", "heart", "stamp"].includes(e.frame) ? e.frame : "polaroid";
+    const fcls = frame === "tape" ? "tape-frame" : frame;
+    const vid = e.previewSrc ? `<video src="${e.previewSrc}" muted playsinline preload="metadata"></video>`
+      : full ? videoHtml(e.media) : `<div class="vid-tile" aria-label="a video">▶</div>`;
+    return `<article class="card photo video ${fcls}${cls}" ${common}>${frame === "tape" ? tapeHtml(e, 2) : ""}${top}
+      <div class="body"><div class="wrap">${vid}</div>
+      ${e.caption ? `<div class="cap">${esc(e.caption)}</div>` : ""}${guessHtml(e)}</div>${lock}${binNote}${signHtml(e)}</article>`;
+  }
   if (e.type === "voice") {
     return `<article class="card voice${cls}" ${common}>${top}
       <div class="body"><div class="label-strip">${esc(e.title || "a little voice note")}</div>
@@ -92,7 +111,7 @@ function cardHtml(e) {
 }
 
 // The wall shows everything that isn't archived or in the recycle bin.
-const onWall = e => !e.status && ["note", "photo", "voice"].includes(e.type); // calls etc. live in their own widget
+const onWall = e => !e.status && ["note", "photo", "video", "voice"].includes(e.type); // calls etc. live in their own widget
 function render() {
   const wall = entries.filter(onWall);
   const binned = entries.filter(e => e.status === "binned").length;
@@ -100,7 +119,7 @@ function render() {
   const list = entries.filter(e =>
       filter === "archive" ? e.status === "archived"
     : filter === "bin" ? e.status === "binned"
-    : onWall(e) && (filter === "all" || (filter === "answers" ? e.prompt : e.type === filter)))
+    : onWall(e) && (filter === "all" || (filter === "answers" ? e.prompt : filter === "photo" ? ["photo", "video"].includes(e.type) : e.type === filter)))
     .sort((a, b) => new Date(b.at) - new Date(a.at));
   $("#sub").textContent = wall.length
     ? `${wall.length} ${wall.length === 1 ? "page" : "pages"} of us so far`
@@ -156,7 +175,7 @@ function goldieeNudge() {
   if (kw) return g.say("your turn in who knows whom 🎯", "games.html#kwho", "play →");
   const race = entries.find(e => e.type === "race" && !e.cancelled && (e.accepted ? (e.by === NAME || e.with === NAME) && !e.times?.[NAME] : e.with === NAME));
   if (race) return g.say(race.accepted ? "your puzzle race is waiting 🧩" : `${race.by} challenged you to a puzzle race 🧩`, "games.html#race", "play →");
-  const replied = entries.find(e => onWall(e) && (e.replies || []).some(r => isFresh(r.at, r.by)));
+  const replied = entries.find(e => onWall(e) && unreadReplies(e));
   if (replied) return g.say(`${partnerOf(NAME)} replied to a page 💬`, () => openPost(replied.id), "read it →");
   const fresh = $$(".new-ribbon");
   if (fresh.length) return g.say(`${fresh.length} new ${fresh.length === 1 ? "page" : "pages"} from ${partnerOf(NAME)} 💌`,
@@ -487,6 +506,15 @@ async function shrinkImage(file, max = 1600, mirror = false) {
 }
 $("#photoInput").addEventListener("change", async e => {
   const file = e.target.files[0]; if (!file) return;
+  // A video goes up as it is (no shrinking); it becomes a "video" page.
+  if (isVideoFile(file)) {
+    if (videoTooBig(file)) { e.target.value = ""; return; }
+    state.video = file; state.photo = null; state.photoFile = null;
+    $("#flipBtn").hidden = true; $("#photoPreview").hidden = true; $("#dropText").hidden = true;
+    const v = $("#videoPreview"); v.src = URL.createObjectURL(file); v.hidden = false;
+    return updatePreview();
+  }
+  state.video = null; $("#videoPreview").hidden = true;
   try {
     state.photoFile = file; state.mirror = false;
     state.photo = await shrinkImage(file);
@@ -561,7 +589,11 @@ function updatePreview() {
     guess: state.prompt && !together ? f.guess.value.trim() : "",
   };
   if (state.type === "note") Object.assign(draft, { paper: state.paper, title: state.prompt ? "" : f.title.value.trim(), text: f.text.value.trim() || "Dear you…" });
-  if (state.type === "photo") {
+  if (state.type === "photo" && state.video) {
+    if (previewPhotoUrl) URL.revokeObjectURL(previewPhotoUrl);
+    previewPhotoUrl = URL.createObjectURL(state.video);
+    Object.assign(draft, { type: "video", frame: state.frame, caption: f.caption.value.trim(), media: "preview.mp4", previewSrc: previewPhotoUrl });
+  } else if (state.type === "photo") {
     if (state.photo) { if (previewPhotoUrl) URL.revokeObjectURL(previewPhotoUrl); previewPhotoUrl = URL.createObjectURL(state.photo); }
     Object.assign(draft, { frame: state.frame, caption: f.caption.value.trim(), media: "preview.jpg",
       previewSrc: state.photo ? previewPhotoUrl : "data:image/svg+xml," + encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 4 3"><rect width="4" height="3" fill="#f3d9d4"/></svg>') });
@@ -573,9 +605,10 @@ composer.addEventListener("input", updatePreview);
 
 function resetComposer() {
   composer.reset();
-  Object.assign(state, { stickers: [], photo: null, voice: null, voiceMime: "", duration: 0, prompt: null });
+  Object.assign(state, { stickers: [], photo: null, video: null, voice: null, voiceMime: "", duration: 0, prompt: null });
   $$("#stickerPicker button").forEach(b => b.classList.remove("on"));
   $("#photoPreview").hidden = true; $("#dropText").hidden = false; $("#photoInput").value = "";
+  $("#videoPreview").hidden = true; $("#videoPreview").removeAttribute("src");
   state.photoFile = null; state.mirror = false; $("#flipBtn").hidden = true;
   recPreview.hidden = true; recTime.textContent = "tap to record";
 }
@@ -604,23 +637,25 @@ composer.addEventListener("submit", async e => {
     if (!f.text.value.trim()) return setStatus(st, "Write something first ♥", true);
     Object.assign(entry, { title: state.prompt ? "" : f.title.value.trim(), text: f.text.value.trim(), paper: state.paper });
   } else if (state.type === "photo") {
-    if (!state.photo) return setStatus(st, "Choose a picture first.", true);
+    if (!state.photo && !state.video) return setStatus(st, "Choose a picture or a video first.", true);
+    if (state.video) entry.type = "video";
     Object.assign(entry, { caption: f.caption.value.trim(), frame: state.frame });
   } else {
     if (!state.voice) return setStatus(st, "Record something first.", true);
     Object.assign(entry, { title: f.voiceTitle.value.trim(), duration: Math.round(state.duration) });
   }
 
-  const kind = entry.prompt ? "answer" : state.type === "note" ? "note" : state.type === "photo" ? "picture" : "voice note";
+  const isVid = entry.type === "video";
+  const kind = entry.prompt ? "answer" : state.type === "note" ? "note" : isVid ? "video" : state.type === "photo" ? "picture" : "voice note";
   btn.disabled = true;
   try {
-    const blob = state.type === "photo" ? state.photo : state.type === "voice" ? state.voice : null;
+    const blob = isVid ? state.video : state.type === "photo" ? state.photo : state.type === "voice" ? state.voice : null;
     if (blob) {
-      setStatus(st, state.type === "photo" ? "Uploading the picture…" : "Uploading the voice note…");
-      const ext = state.type === "photo" ? "jpg" : ({ "audio/mp4": "m4a", "audio/ogg": "ogg" }[state.voiceMime] || "webm");
+      setStatus(st, isVid ? "Uploading the video… (big ones take a minute)" : state.type === "photo" ? "Uploading the picture…" : "Uploading the voice note…");
+      const ext = isVid ? videoExt(state.video) : state.type === "photo" ? "jpg" : ({ "audio/mp4": "m4a", "audio/ogg": "ogg" }[state.voiceMime] || "webm");
       const packed = await packMedia(`${MEDIA_DIR}${id}.${ext}`, blob); // encrypted when the vault is on
       entry.media = packed.path;
-      const res = await putFile(entry.media, packed.b64, `${state.type === "photo" ? "Picture" : "Voice note"} from ${NAME}`);
+      const res = await putFile(entry.media, packed.b64, `${isVid ? "Video" : state.type === "photo" ? "Picture" : "Voice note"} from ${NAME}`);
       entry.mediaSha = res.content.sha;
     }
     setStatus(st, "Sticking it in…");

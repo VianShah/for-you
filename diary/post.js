@@ -1,11 +1,12 @@
 /* One page, opened: replies (text, a voice note or a picture), download / share,
    and archive / recycle bin. Replies are kept inside the page (entry.replies), so
-   they never stretch the wall; the wall only shows a small 💬 count.
+   they never stretch the wall; the wall only shows 💬 when there are replies you
+   haven't opened yet.
    Uses the helpers and state from core.js and diary.js. */
 let openId = null;
-const reply = { photo: null, voice: null, voiceMime: "", duration: 0 };
+const reply = { photo: null, video: null, voice: null, voiceMime: "", duration: 0 };
 const fileCache = new Map(); // path → Promise<File>, ready before the share sheet needs it
-const kindOf = e => e.prompt ? "answer" : e.type === "note" ? "note" : e.type === "photo" ? "picture" : "voice note";
+const kindOf = e => e.prompt ? "answer" : e.type === "note" ? "note" : e.type === "photo" ? "picture" : e.type === "video" ? "video" : "voice note";
 const newId = () => Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
 const when = at => new Date(at).toLocaleString("en-GB", { day: "numeric", month: "short", hour: "numeric", minute: "2-digit", hour12: true }).toLowerCase();
 const nowIso = () => new Date().toISOString();
@@ -15,8 +16,11 @@ function openPost(id) {
   const e = entries.find(x => x.id === id); if (!e) return;
   if (isLocked(e)) return startAnswer(e.prompt);
   openId = id;
+  const hadUnread = unreadReplies(e);
+  markRead(id); // its 💬 goes away once you've seen the replies
   renderPost();
   openSheet("#postBack");
+  if (hadUnread) render();
 }
 function closePost() {
   openId = null;
@@ -29,7 +33,7 @@ function renderPost() {
   const e = entries.find(x => x.id === openId);
   if (!e) { $("#postBack").hidden = true; return closePost(); }
   $("#postTitle").textContent = e.status === "binned" ? "In the bin" : e.status === "archived" ? "In the archive" : `${e.author}'s ${kindOf(e)}`;
-  $("#postCard").innerHTML = cardHtml(e);
+  $("#postCard").innerHTML = cardHtml(e, true);
 
   const a = [];
   if (e.media) {
@@ -61,6 +65,7 @@ function replyHtml(r) {
   const mine = r.by === NAME;
   let media = "";
   if (r.kind === "photo") media = `<img class="reply-img" ${imgSrcAttrs(r.media)} data-path="${esc(r.media)}" alt="a picture reply">`;
+  if (r.kind === "video") media = videoHtml(r.media, "reply-video");
   if (r.kind === "voice") media = `<div class="reply-voice"><button type="button" class="play" data-rplay="${esc(r.media)}" aria-label="Play">▶</button><div class="bar"><i></i></div><span class="dur">${fmtDur(r.duration)}</span></div>`;
   const remove = mine && KEY ? ` · <button type="button" class="link-btn" data-rdel="${esc(r.id)}">remove</button>` : "";
   const heart = r.hearts?.length ? `<span class="reply-heart" title="❤️ from ${esc(r.hearts.join(" & "))}">❤️</span>` : "";
@@ -255,11 +260,12 @@ replyText.addEventListener("keydown", ev => {
 function showAttach() {
   const box = $("#replyAttach");
   if (reply.photo) box.innerHTML = `<img src="${URL.createObjectURL(reply.photo)}" alt=""><span>picture</span><button type="button" class="link-btn" data-flip>↔ flip</button><button type="button" class="link-btn" data-clear>✕</button>`;
+  else if (reply.video) box.innerHTML = `<video src="${URL.createObjectURL(reply.video)}" muted playsinline controls></video><span>video</span><button type="button" class="link-btn" data-clear>✕</button>`;
   else if (reply.voice) box.innerHTML = `<audio controls src="${URL.createObjectURL(reply.voice)}"></audio><button type="button" class="link-btn" data-clear>✕</button>`;
-  box.hidden = !(reply.photo || reply.voice);
+  box.hidden = !(reply.photo || reply.video || reply.voice);
 }
 function resetReply() {
-  Object.assign(reply, { photo: null, photoFile: null, mirror: false, voice: null, voiceMime: "", duration: 0 });
+  Object.assign(reply, { photo: null, photoFile: null, mirror: false, video: null, voice: null, voiceMime: "", duration: 0 });
   $("#replyPhoto").value = "";
   $("#replyAttach").hidden = true; $("#replyAttach").innerHTML = "";
   setStatus($("#replyStatus"), "");
@@ -276,7 +282,12 @@ $("#replyAttach").addEventListener("click", async ev => {
 $("#replyPhoto").addEventListener("change", async ev => {
   const file = ev.target.files[0]; if (!file) return;
   stopReplyRecording();
-  try { reply.voice = null; reply.photoFile = file; reply.mirror = false; reply.photo = await shrinkImage(file, 1280); showAttach(); }
+  if (isVideoFile(file)) {
+    if (videoTooBig(file)) { ev.target.value = ""; return; }
+    Object.assign(reply, { voice: null, photo: null, photoFile: null, video: file });
+    return showAttach();
+  }
+  try { reply.video = null; reply.voice = null; reply.photoFile = file; reply.mirror = false; reply.photo = await shrinkImage(file, 1280); showAttach(); }
   catch { toast("Couldn't open that picture. Try a JPG or PNG."); }
 });
 
@@ -297,7 +308,7 @@ $("#replyRec").addEventListener("click", async () => {
     clearInterval(rTimer);
     btn.classList.remove("recording"); btn.textContent = "🎙";
     if (!chunks.length) return;
-    reply.photo = null;
+    reply.photo = null; reply.video = null;
     reply.voiceMime = (rRecorder.mimeType || mime || "audio/webm").split(";")[0];
     reply.voice = new Blob(chunks, { type: reply.voiceMime });
     reply.duration = (Date.now() - rStart) / 1000;
@@ -321,18 +332,18 @@ $("#replyForm").addEventListener("submit", async ev => {
   ev.preventDefault();
   const e = entries.find(x => x.id === openId); if (!e) return;
   const text = replyText.value.trim();
-  if (!text && !reply.photo && !reply.voice) return;
+  if (!text && !reply.photo && !reply.video && !reply.voice) return;
   if (!canWrite()) return;
   const st = $("#replyStatus"), btn = $("#replySend");
   btn.disabled = true;
   try {
     const r = { id: newId(), by: NAME, at: nowIso() };
     if (text) r.text = text;
-    const blob = reply.photo || reply.voice;
+    const blob = reply.photo || reply.video || reply.voice;
     if (blob) {
-      r.kind = reply.photo ? "photo" : "voice";
-      const ext = reply.photo ? "jpg" : ({ "audio/mp4": "m4a", "audio/ogg": "ogg" }[reply.voiceMime] || "webm");
-      setStatus(st, "Sending…");
+      r.kind = reply.photo ? "photo" : reply.video ? "video" : "voice";
+      const ext = reply.photo ? "jpg" : reply.video ? videoExt(reply.video) : ({ "audio/mp4": "m4a", "audio/ogg": "ogg" }[reply.voiceMime] || "webm");
+      setStatus(st, reply.video ? "Sending the video… (big ones take a minute)" : "Sending…");
       const packed = await packMedia(`${MEDIA_DIR}${e.id}-r${r.id}.${ext}`, blob); // encrypted when the vault is on
       const res = await putFile(packed.path, packed.b64, `A reply from ${NAME}`);
       r.media = packed.path; r.mediaSha = res.content.sha;

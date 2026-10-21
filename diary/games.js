@@ -28,7 +28,7 @@ async function retireQuestion(qid) {
   try {
     const skip = { id: Date.now().toString(36) + Math.random().toString(36).slice(2, 6), type: "skip", qid, by: NAME, at: new Date().toISOString() };
     allPages = await updateIndex(list => [skip, ...list], `${NAME} retired a question`);
-    entries = allPages.filter(e => !e.status && ["note", "photo", "voice"].includes(e.type));
+    entries = allPages.filter(e => !e.status && ["note", "photo", "video", "voice"].includes(e.type));
     toast("Gone. Here's another one ✨");
     return true;
   } catch (err) { toast(err.message); return false; }
@@ -120,7 +120,7 @@ function buildQuiz() {
     if (days.length >= 3) {
       const right = dayLabel(e.at);
       const show = e.type === "photo" ? `<img class="quiz-img" ${imgSrcAttrs(e.media)} alt="">`
-        : `<blockquote>${esc(snippet(e.text || e.title || e.caption || "a voice note", 110))}</blockquote>`;
+        : `<blockquote>${esc(snippet(e.text || e.title || e.caption || (e.type === "video" ? "a video" : "a voice note"), 110))}</blockquote>`;
       pool.push({ id: e.id + "d", ask: "When was this added?", show,
         options: shuffle([right, ...shuffle(days.filter(d => d !== right)).slice(0, 2)]), answer: right });
     }
@@ -201,7 +201,7 @@ function goldieeNudge() {
 async function gameSave(change, message, render) {
   try {
     allPages = await updateIndex(change, message);
-    entries = allPages.filter(e => !e.status && ["note", "photo", "voice"].includes(e.type));
+    entries = allPages.filter(e => !e.status && ["note", "photo", "video", "voice"].includes(e.type));
     renderGoldieBar(allPages);
     if (render) render();
     return true;
@@ -232,7 +232,7 @@ function renderProgress() {
     await applyVaultKey(await Vault.lockScreen(VAULT, { title: "Mini games", hint: "Type our secret word to play." }));
   }
   try { allPages = (await loadIndex()).entries; } catch {}
-  entries = allPages.filter(e => !e.status && ["note", "photo", "voice"].includes(e.type)); // archived & binned pages (and calls) stay out of the games
+  entries = allPages.filter(e => !e.status && ["note", "photo", "video", "voice"].includes(e.type)); // archived & binned pages (and calls) stay out of the games
   renderGoldieBar(allPages);
   if (NAME) { $("#pingBtn").hidden = false; $("#pingBtn").textContent = `🔔 ping ${partnerOf(NAME)} to come and play`; }
   setInterval(() => renderGoldieBar(allPages), 60000);
