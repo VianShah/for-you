@@ -160,10 +160,30 @@ function render() {
   }
   renderGoldieBar(entries);
   if (typeof renderCallWidget === "function") renderCallWidget();
-  book.innerHTML = [...days].map(([d, es]) =>
+  // Pinned to the top from the shop: on the everything view, it sits above the days for 24 hours.
+  const pins = filter === "all" ? pinnedToTop(entries).map(p => ({ p, e: entries.find(x => x.id === p.page && onWall(x)) })).filter(x => x.e) : [];
+  const pinned = pins.length ? `<section class="day pinned-day"><div class="day-label">📌 pinned to the top</div><div class="grid">${pins.map(({ p, e }) => cardHtml(e).replace('<article class="card', `<article title="pinned by ${esc(p.by)}" class="card pinned-card`)).join("")}</div></section>` : "";
+  book.innerHTML = pinned + [...days].map(([d, es]) =>
     `<section class="day"><div class="day-label">${esc(d)}</div><div class="grid">${es.map(cardHtml).join("")}</div></section>`
   ).join("");
   hydrateMedia(book);
+  showSurprise();
+}
+
+// A surprise bought in the shop: hearts and their note, the first time this phone opens the diary after.
+function showSurprise() {
+  if (!NAME || $(".surprise-pop")) return;
+  const seen = store.get("surprises-seen").split(",");
+  const s = surprisesFor(entries, NAME).find(e => !seen.includes(e.id));
+  if (!s) return;
+  store.set("surprises-seen", [s.id, ...seen.filter(Boolean)].slice(0, 100).join(","));
+  const back = document.createElement("div");
+  back.className = "sheet-back surprise-pop";
+  back.innerHTML = `<div class="sheet small surprise-card"><div class="surprise-look">${window.goldiee?.look ? goldiee.look(currentOutfit(entries)) : "🐶"}</div>
+    <small>a surprise from ${esc(s.by)}</small><p>${esc(s.note || "Just thinking of you ♥")}</p><button class="save" data-close>aww ♥</button></div>`;
+  back.addEventListener("click", ev => { if (ev.target === back || ev.target.closest("[data-close]")) back.remove(); });
+  document.body.appendChild(back);
+  for (let i = 0; i < 4; i++) setTimeout(() => burst(innerWidth * (.2 + Math.random() * .6), innerHeight * (.25 + Math.random() * .4), 18), i * 350);
 }
 
 let autoRefreshOn = false;

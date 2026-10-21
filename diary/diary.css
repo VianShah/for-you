@@ -637,8 +637,6 @@ textarea.field.hand { font-family: var(--hand); font-size: 24px; line-height: 1.
 .si-look .goldiee-look { width: 74px; height: 74px; margin-bottom: 12px; }
 .goldiee-look { display: inline-block; }
 .goldiee-look svg { width: 100%; height: 100%; overflow: visible; display: block; }
-.wardrobe-stage { display: grid; justify-items: center; gap: 4px; margin: 26px 0 16px; }
-.wardrobe-stage .goldiee-look { width: 150px; height: 150px; margin-bottom: 26px; filter: drop-shadow(0 10px 14px rgba(110,35,55,.25)); }
 .coupon-card { display: flex; gap: 12px; align-items: flex-start; background: var(--paper); color: var(--ink); border-radius: 14px; padding: 14px 16px;
   border: 2px dashed var(--rose); box-shadow: 0 14px 30px -20px rgba(110,35,55,.5); }
 .coupon-card.for-me { background: #fff6d6; border-color: #e2b23a; }
@@ -677,3 +675,36 @@ body[data-day-theme="garden"]::before { background-image: url("data:image/svg+xm
 :root[data-theme="dark"] body[data-day-theme="snow"]::before { background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='120' height='120'%3E%3Ctext opacity='.45' x='14' y='34' font-size='18'%3E❄️%3C/text%3E%3Ctext opacity='.45' x='78' y='92' font-size='14'%3E❄️%3C/text%3E%3C/svg%3E"), radial-gradient(rgba(243,214,219,.07) 1px, transparent 1.2px); background-size: 120px 120px, 22px 22px; }
 :root[data-theme="dark"] body[data-day-theme="spooky"]::before { background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='120' height='120'%3E%3Ctext opacity='.45' x='16' y='38' font-size='20'%3E🎃%3C/text%3E%3Ctext opacity='.45' x='76' y='96' font-size='16'%3E🦇%3C/text%3E%3C/svg%3E"), radial-gradient(rgba(243,214,219,.07) 1px, transparent 1.2px); background-size: 120px 120px, 22px 22px; }
 :root[data-theme="dark"] body[data-day-theme="garden"]::before { background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='120' height='120'%3E%3Ctext opacity='.45' x='16' y='38' font-size='20'%3E🌸%3C/text%3E%3Ctext opacity='.45' x='76' y='96' font-size='16'%3E🌿%3C/text%3E%3C/svg%3E"), radial-gradient(rgba(243,214,219,.07) 1px, transparent 1.2px); background-size: 120px 120px, 22px 22px; }
+
+/* Goldiee's dressing room: she's the star of the shop */
+.wardrobe-stage { position: relative; display: grid; justify-items: center; gap: 2px; margin: 8px 0 18px; padding: 54px 0 14px; border-radius: 20px; overflow: hidden;
+  background: radial-gradient(ellipse at 50% 80%, rgba(255,214,140,.55), transparent 60%), linear-gradient(180deg, #fff6e6, #fbe9e4); }
+.stage-light { position: absolute; left: 50%; top: -40px; width: 260px; height: 320px; transform: translateX(-50%); pointer-events: none;
+  background: radial-gradient(ellipse at 50% 0%, rgba(255,240,200,.9), transparent 70%); }
+.stage-bubble { position: relative; font-family: var(--hand); font-size: 24px; line-height: 1.1; color: #3a2026; background: #fff; padding: 8px 16px; border-radius: 18px 18px 18px 4px;
+  box-shadow: 0 10px 22px -14px rgba(110,35,55,.5); margin-bottom: 6px; max-width: 80%; text-align: center; animation: up .4s both; }
+.stage-pup { position: relative; animation: g-hop 2.6s ease-in-out infinite; }
+.stage-pup .goldiee-look { width: 200px; height: 200px; margin-bottom: 30px; filter: drop-shadow(0 16px 18px rgba(110,35,55,.28)); }
+@keyframes g-hop { 0%, 70%, 100% { transform: translateY(0); } 80% { transform: translateY(-10px); } 90% { transform: translateY(0); } 95% { transform: translateY(-4px); } }
+.stage-name { position: relative; font-family: var(--script); font-size: 44px; color: var(--wine); line-height: .9; }
+.wardrobe-stage .hint { position: relative; }
+.wardrobe-stage .game-actions { position: relative; margin-top: 8px; }
+.shop-item.trying { border-style: dashed; border-color: var(--rose); box-shadow: 0 0 0 2px rgba(217,123,134,.35) inset; }
+.si-swatch.photo { display: grid; place-items: center; font-size: 24px; background: linear-gradient(135deg, #f3d9d4, #e8c0c6) center / cover; }
+.upload-btn { display: block; text-align: center; margin-bottom: 12px; cursor: pointer; }
+:root[data-theme="dark"] .wardrobe-stage { background: radial-gradient(ellipse at 50% 80%, rgba(255,190,110,.18), transparent 60%), linear-gradient(180deg, #2c1e22, #221719); }
+:root[data-theme="dark"] .stage-name { color: #f2a7b1; }
+
+/* a picture of yours as today's backdrop, softly faded so the pages stay readable */
+body[data-day-theme="photo"]::before { background: linear-gradient(rgba(251,245,239,.78), rgba(251,245,239,.78)), var(--day-photo, none) center / cover no-repeat; }
+:root[data-theme="dark"] body[data-day-theme="photo"]::before { background: linear-gradient(rgba(22,16,19,.78), rgba(22,16,19,.78)), var(--day-photo, none) center / cover no-repeat; }
+
+/* pinned to the top of the wall */
+.pinned-day .day-label { color: var(--wine); }
+.card.pinned-card { outline: 2px dashed var(--rose); outline-offset: 6px; }
+
+/* a surprise from the shop */
+.surprise-card { text-align: center; display: grid; justify-items: center; gap: 8px; }
+.surprise-card .goldiee-look { width: 120px; height: 120px; margin-bottom: 18px; }
+.surprise-card small { font-size: 11px; letter-spacing: .2em; text-transform: uppercase; color: var(--rose); }
+.surprise-card p { font-family: var(--hand); font-size: 30px; line-height: 1.15; color: var(--ink); }

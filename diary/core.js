@@ -344,13 +344,19 @@ function renderGoldieBar(list) {
   const s = PEOPLE.map(p => Goldies.score(list, p));
   const side = x => `<span class="gb-side${x.name === NAME ? " me" : ""}${x.crying ? " sad" : ""}"><span class="gb-name">${esc(x.name)}${x.crying ? " · sad" : ""}</span><span class="gb-num">${x.points}</span></span>`;
   const mine = s.find(x => x.name === NAME);
-  const hint = !mine ? "" : `−${Goldies.RULES.PENALTY} in <b class="gb-count" data-penalty-at="${mine.nextPenaltyAt}">${fmtLeft(Goldies.awakeMs(Date.now(), mine.nextPenaltyAt))}</b>${Goldies.isAwake(Date.now()) ? "" : " · paused, you're asleep 💤"}`;
+  const hint = !mine ? "" : mine.shieldUntil ? `🛡 shielded till ${new Date(mine.shieldUntil).toLocaleTimeString("en-GB", { hour: "numeric", minute: "2-digit", hour12: true }).toLowerCase()} · no −${Goldies.RULES.PENALTY}s` : `−${Goldies.RULES.PENALTY} in <b class="gb-count" data-penalty-at="${mine.nextPenaltyAt}">${fmtLeft(Goldies.awakeMs(Date.now(), mine.nextPenaltyAt))}</b>${Goldies.isAwake(Date.now()) ? "" : " · paused, you're asleep 💤"}`;
   const st = Goldies.streak(list, PEOPLE);
   goldieList = list;
   // Bought in the shop (shop-items.js): Goldiee's outfit, and today's backdrop on every page.
   if (typeof currentOutfit === "function") {
     window.goldiee?.wear?.(currentOutfit(list));
-    document.body.dataset.dayTheme = todaysTheme(list);
+    const t = todaysThemeBuy(list);
+    document.body.dataset.dayTheme = t ? t.theme : "";
+    // One of your own pictures as the backdrop: decrypted once, then shown behind everything.
+    if (t?.theme === "photo" && t.photo && document.body.dataset.dayPhoto !== t.photo) {
+      document.body.dataset.dayPhoto = t.photo;
+      playableUrl(t.photo).then(u => document.body.style.setProperty("--day-photo", `url("${u}")`)).catch(() => {});
+    }
   }
   el.innerHTML = `${side(s[0])}<span class="gb-mid" title="days in a row you both posted"><span class="gb-streak">${st}</span><span class="gb-lbl">day${st === 1 ? "" : "s"} together</span></span>${side(s[1])}${hint ? `<small class="gb-hint">goldies · ${hint}</small>` : ""}`;
   el.hidden = false;

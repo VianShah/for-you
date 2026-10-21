@@ -18,6 +18,7 @@ const SHOP = {
     shades:    { name: "Cool shades",     emoji: "😎", price: 80,  hat: false },
   },
   // The diary's background for the rest of the day (India time), on both phones.
+  PHOTO_THEME: 150, // …or one of your own pictures as the backdrop
   themes: {
     diwali:  { name: "Diwali lights",  emoji: "🪔", price: 80 },
     hearts:  { name: "Full of hearts", emoji: "💗", price: 80 },
@@ -28,22 +29,29 @@ const SHOP = {
   },
   // See the other one's answer to a question without answering it first.
   PEEK: 50,
-  // Love coupons for long distance: you buy one, the other one makes it happen from wherever
-  // they are, and when you say "got it ❤️" they earn COUPON_REWARD goldies for doing it.
+  // Dares (saved as item "coupon", from when they were love coupons): you buy one for the
+  // other person, they do it from wherever they are, and when you tap "got it" they earn
+  // COUPON_REWARD goldies for being brave.
   coupons: {
-    voice:    { name: "A voice note just for me",        emoji: "🎙️", price: 60,  hint: "sing, read me something, or just talk" },
-    photo:    { name: "A photo of you, right now",       emoji: "📸", price: 40,  hint: "no filters, no retakes" },
-    morning:  { name: "A good-morning call",             emoji: "🌅", price: 60,  hint: "the first voice I hear tomorrow" },
-    sleep:    { name: "Stay on call till I fall asleep", emoji: "🌙", price: 100, hint: "even if I start snoring" },
-    movie:    { name: "Watch party, I pick the movie",   emoji: "🍿", price: 80,  hint: "start it at the same time, call on" },
-    playlist: { name: "Make me a playlist",              emoji: "🎶", price: 70,  hint: "songs that remind you of me" },
-    food:     { name: "Surprise food delivery",          emoji: "🛵", price: 200, hint: "send my favourite to my door" },
-    letter:   { name: "A real letter, in the post",      emoji: "✉️", price: 150, hint: "handwritten, stamped, the lot" },
-    date:     { name: "A video date night you plan",     emoji: "🕯️", price: 120, hint: "dress up, candles, a plan" },
-    parcel:   { name: "A surprise parcel",               emoji: "🎁", price: 300, hint: "anything, as long as it's a surprise" },
-    visit:    { name: "Plan our next visit together",    emoji: "✈️", price: 100, hint: "dates, tickets, a countdown" },
+    voice:    { name: "Send me a voice note, just for me",  emoji: "🎙️", price: 60,  hint: "sing, read me something, or just talk" },
+    photo:    { name: "A photo of you, right now",          emoji: "📸", price: 40,  hint: "no filters, no retakes, no fixing your hair" },
+    morning:  { name: "Wake me up with a good-morning call", emoji: "🌅", price: 60,  hint: "the first voice I hear tomorrow" },
+    sleep:    { name: "Stay on call till I fall asleep",    emoji: "🌙", price: 100, hint: "even if I start snoring" },
+    playlist: { name: "Make me a playlist",                 emoji: "🎶", price: 70,  hint: "songs that remind you of me" },
+    movie:    { name: "I pick the movie, you watch it",     emoji: "🍿", price: 80,  hint: "no complaints, no skipping" },
+    song:     { name: "Sing our song on a voice note",      emoji: "🎤", price: 70,  hint: "the whole thing, off-key is fine" },
+    silly:    { name: "Your silliest face, on camera",      emoji: "🤪", price: 30,  hint: "worse than that. sillier." },
+    three:    { name: "Three things you love about me",     emoji: "💞", price: 50,  hint: "out loud, on a voice note" },
+    outfit:   { name: "Wear what I pick on our next call",  emoji: "👗", price: 80,  hint: "I choose, you wear it, no backing out" },
+    truth:    { name: "Answer one question, honestly",      emoji: "🙊", price: 60,  hint: "I ask in the note, you answer, no dodging" },
   },
   COUPON_REWARD: 20,
+  // Little extras.
+  GIFTS: [50, 100],                 // send the other one some goldies
+  SHIELD: { price: 120, hours: 12 },  // no −50s for you for 12 hours (exams, travel, a busy day)
+  PINTOP: { price: 60, hours: 24 },   // one page sits at the top of the diary wall for a day
+  SURPRISE: 30,                     // hearts burst and your note pops up the next time they open the diary
+  SUPERPING: 20,                    // a loud, can't-miss notification with your own words
 };
 
 const buys = (list, item) => (list || []).filter(e => e.type === "buy" && e.item === item && !e.cancelled);
@@ -63,6 +71,16 @@ function todaysTheme(list, now = Date.now()) {
 }
 const peeked = (list, name, qid) => buys(list, "peek").some(e => e.by === name && e.qid === qid);
 const openCoupons = (list, forName) => buys(list, "coupon").filter(e => e.for === forName && !e.thanked);
+// Today's backdrop purchase itself (for a photo backdrop, its picture is in .photo).
+function todaysThemeBuy(list, now = Date.now()) {
+  const day = ms => Math.floor((ms / 60000 + 330) / 1440);
+  return buys(list, "theme").filter(e => day(Date.parse(e.at)) === day(now)).sort((a, b) => Date.parse(b.at) - Date.parse(a.at))[0] || null;
+}
+const activeShield = (list, name, now = Date.now()) => buys(list, "shield").find(e => e.by === name && now - Date.parse(e.at) < (e.hours || 12) * 3600000) || null;
+// Pages pinned to the top of the wall right now, newest pin first.
+const pinnedToTop = (list, now = Date.now()) => buys(list, "pintop").filter(e => now - Date.parse(e.at) < (e.hours || 24) * 3600000)
+  .sort((a, b) => Date.parse(b.at) - Date.parse(a.at));
+const surprisesFor = (list, name) => buys(list, "surprise").filter(e => e.for === name);
 
 /* ---------- Goldiee's outfits, drawn on her 100×100 picture ---------- */
 const OUTFIT_SVG = {

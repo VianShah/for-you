@@ -91,10 +91,15 @@
         }
         continue;
       }
-      // A love coupon from the shop: whoever made it happen earns a reward once the buyer says "got it".
+      // A dare from the shop (saved as item "coupon"): whoever did it earns a reward once the buyer says "got it".
       if (e.type === "buy" && e.item === "coupon") {
         if (e.thanked && e.for === name && !e.cancelled && Date.parse(e.thanked.at) >= START)
-          out.push({ at: Date.parse(e.thanked.at), pts: e.reward || 20, why: "a love coupon, made happen 💌", game: true });
+          out.push({ at: Date.parse(e.thanked.at), pts: e.reward || 20, why: "a dare, done 😈", game: true });
+        continue;
+      }
+      // Goldies gifted in the shop land with the other one (not counted as them being active).
+      if (e.type === "buy" && e.item === "gift") {
+        if (e.for === name && !e.cancelled && at >= START) out.push({ at, pts: e.amount || 0, why: `a gift from ${e.by} 🎁`, gift: true, noClock: true });
         continue;
       }
       // "Who knows whom" pays out once the guess is judged (skipped rounds pay nothing).
@@ -129,9 +134,13 @@
     const ev = events(entries, name);
     const earned = ev.reduce((s, x) => s + x.pts, 0);
     // −50 for each full 3.5 awake hours between activities; any activity resets the clock.
+    // A quiet-day shield from the shop pauses the clock, like sleep time, while it lasts.
+    const shields = (entries || []).filter(e => e.type === "buy" && e.item === "shield" && e.by === name && !e.cancelled)
+      .map(e => ({ from: Date.parse(e.at), to: Date.parse(e.at) + (e.hours || 12) * 3600000 }));
+    const quietMs = (a, b) => awakeMs(a, b) - shields.reduce((s, w) => s + awakeMs(Math.max(a, w.from), Math.min(b, w.to)), 0);
     let lost = 0, last = START, penalties = [];
-    for (const t of [...ev.map(x => x.at), now]) {
-      const blocks = Math.floor(awakeMs(last, Math.min(t, now)) / (RULES.GAP_MIN * MIN));
+    for (const t of [...ev.filter(x => !x.noClock).map(x => x.at), now]) {
+      const blocks = Math.floor(quietMs(last, Math.min(t, now)) / (RULES.GAP_MIN * MIN));
       if (blocks > 0) { lost += blocks * RULES.PENALTY; penalties.push({ at: Math.min(t, now), pts: -blocks * RULES.PENALTY, why: `${blocks * RULES.GAP_MIN / 60} quiet hours` }); }
       if (t < now) last = Math.max(last, t); // "now" isn't activity: the clock runs from the last real post
     }
@@ -142,21 +151,24 @@
     const bets = races(entries).filter(r => r.bet && (r.winner === name || r.loser === name))
       .map(r => r.winner === name ? { at: r.at, pts: r.bet, why: "won a puzzle race 🧩" } : { at: r.at, pts: -r.bet, why: "lost a puzzle race 🧩" });
     const won = bets.reduce((s, x) => s + x.pts, 0);
-    const sinceLast = awakeMs(last, now) % (RULES.GAP_MIN * MIN);
+    const sinceLast = quietMs(last, now) % (RULES.GAP_MIN * MIN);
+    const shield = shields.find(w => now >= w.from && now < w.to);
     const points = earned - lost - spent + won;
     return {
       name, earned, lost, spent, won,
       points,
       crying: points < RULES.CRY_BELOW,
       nextPenaltyIn: (RULES.GAP_MIN * MIN - sinceLast) / MIN, // awake minutes until the next −50
-      nextPenaltyAt: addAwake(now, RULES.GAP_MIN * MIN - sinceLast), // the moment it lands (sleep time pauses it)
+      nextPenaltyAt: addAwake(shield ? shield.to : now, RULES.GAP_MIN * MIN - sinceLast), // the moment it lands (sleep time and shields pause it)
+      shieldUntil: shield ? shield.to : null,
       lastActive: ev.filter(x => !x.gift).pop()?.at ?? null,
       history: [...ev, ...penalties, ...bets, ...shopHistory(entries, name)].sort((a, b) => b.at - a.at),
     };
   }
 
   // Shop purchases, for the "your last goldies" list.
-  const SHOP_WHY = { outfit: "an outfit for Goldiee 🐶", theme: "a diary backdrop for the day 🎨", peek: "a peek at an answer 👀", coupon: "a love coupon 💌" };
+  const SHOP_WHY = { outfit: "an outfit for Goldiee 🐶", theme: "a diary backdrop for the day 🎨", peek: "a peek at an answer 👀", coupon: "a dare 😈",
+    gift: "goldies gifted 🎁", shield: "a quiet-day shield 🛡", pintop: "a page pinned to the top 📌", surprise: "a surprise popup 🎉", superping: "a super ping 📣" };
   const shopHistory = (entries, name) => (entries || []).filter(e => e.type === "buy" && e.by === name && !e.cancelled && e.cost)
     .map(e => ({ at: Date.parse(e.at), pts: -e.cost, why: SHOP_WHY[e.item] || "the shop" }));
 

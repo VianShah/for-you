@@ -48,6 +48,11 @@ function renderPost() {
     a.push(Goldies.pinLive(e.pin) ? `<button type="button" class="ghost pinned" data-act="unpin">🏠 on the home screen till ${until} · remove</button>`
                  : `<button type="button" class="ghost" data-act="pin">🏠 ${e.pin ? "back on" : "add to"} home for ${Goldies.RULES.PIN_DAYS} days · ${Goldies.RULES.PIN_COST} 🪙</button>`);
   }
+  // Pin any page to the top of the wall for a day (the shop's 📌).
+  if (KEY && NAME && !e.status) {
+    const top = pinnedToTop(entries).find(p => p.page === e.id);
+    a.push(top ? `<span class="ghost pinned">📌 pinned to the top by ${esc(top.by)}</span>` : `<button type="button" class="ghost" data-act="pintop">📌 pin to the top for a day · ${SHOP.PINTOP.price} 🪙</button>`);
+  }
   if (KEY) {
     if (!e.status) a.push(`<button type="button" class="ghost" data-act="archive">🗂 archive</button>`, `<button type="button" class="ghost" data-act="bin">🗑 remove</button>`);
     if (e.status === "archived") a.push(`<button type="button" class="ghost" data-act="wall">↩ back to the wall</button>`, `<button type="button" class="ghost" data-act="bin">🗑 move to bin</button>`);
@@ -184,6 +189,16 @@ $("#postBack").addEventListener("click", async ev => {
       notifyPartner(`${NAME} pinned a picture to the home screen 🏠`, `It's in the photo strip on the love page for ${Goldies.RULES.PIN_DAYS} days.`);
       render(); renderPost();
       return toast(`On the home screen 🏠  −${cost} 🪙`);
+    }
+    if (act === "pintop") {
+      const cost = SHOP.PINTOP.price, have = myPoints(entries);
+      if (have < cost) return toast(`You need ${cost} goldies for this. You have ${have} 🪙`);
+      if (!confirm(`Spend ${cost} goldies to keep this page at the top of the diary for ${SHOP.PINTOP.hours} hours?`)) return;
+      const buy = { id: newId(), type: "buy", item: "pintop", page: e.id, by: NAME, at: nowIso(), cost, hours: SHOP.PINTOP.hours };
+      entries = await updateIndex(list => [buy, ...list], `${NAME} pinned a page to the top`);
+      notifyPartner(`📌 ${NAME} pinned a page to the top`, "Open the diary to see it.");
+      render(); renderPost();
+      return toast(`📌 At the top for a day · −${cost} 🪙`);
     }
     if (act === "unpin") {
       if (!confirm("Take this picture off the love page? The goldies aren't given back.")) return;
