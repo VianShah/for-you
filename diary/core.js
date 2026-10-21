@@ -20,6 +20,9 @@ const MEDIA_DIR = "diary/media/";
 // inside it (these public ones are only used before that).
 let NOTIFY_TOPICS = { Vian: "for-you-vian-k7q2m9x4", Jovena: "for-you-jovena-r3w8p1z6" };
 
+// Each person's FaceTime number, kept encrypted inside the vault so both phones have it.
+let PHONES = {};
+
 // The vault (see vault.js). null = not switched on yet, so files are plain.
 let VAULT = null;
 let CRYPTO_KEY = null;
@@ -102,6 +105,7 @@ async function applyVaultKey(key) {
     const s = JSON.parse(await Vault.decryptText(key, VAULT.secrets));
     KEY = s.token || "";
     if (s.topics) NOTIFY_TOPICS = s.topics;
+    if (s.phones) PHONES = s.phones;
     store.set("diary-key", ""); // the key now lives only inside the vault
   }
 }

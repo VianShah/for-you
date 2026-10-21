@@ -2,7 +2,8 @@
    time you spend on calls, saved automatically. Apple doesn't let websites read
    call history, so a call is timed from tapping the button here until you come
    back to the diary. Calls under 30 seconds (didn't connect) aren't saved.
-   Each phone keeps the other person's FaceTime number/email on itself only. */
+   The numbers live encrypted in the vault (PHONES); a number typed in ⚙ settings
+   on a phone takes over on that phone only. */
 const CALL_MIN_SECONDS = 30;
 const CALL_FORGET_HOURS = 5;        // came back much later? then we can't know how long it was
 const isCall = e => e.type === "call";
@@ -28,7 +29,7 @@ function renderCallWidget() {
 }
 
 function startCall(kind) {
-  const to = store.get("facetime-to").replace(/\s+/g, "");
+  const to = (store.get("facetime-to") || PHONES[partnerOf(NAME)] || "").replace(/\s+/g, "");
   if (!to) return openSettings(`Add ${partnerOf(NAME)}'s FaceTime number or Apple ID email first, then tap Save ♥`);
   if (!canWrite()) return;
   store.set("call-pending", JSON.stringify({ kind, start: Date.now() }));

@@ -255,7 +255,7 @@ function openSettings(msg = "", err = false) {
   $("#forgetBtn").hidden = !on && !KEY;
   syncNotifyBlock();
   $("#ftLabel").textContent = `${partnerOf(NAME || PEOPLE[0])}'s FaceTime`;
-  $("#ftInput").value = store.get("facetime-to");
+  $("#ftInput").value = store.get("facetime-to") || PHONES[partnerOf(NAME || PEOPLE[0])] || "";
   setStatus($("#settingsStatus"), msg, err);
   openSheet("#settingsBack");
 }
