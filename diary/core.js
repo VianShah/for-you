@@ -180,9 +180,32 @@ const BLANK = "data:image/gif;base64,R0lGODlhAQABAAAAACH5BAEKAAEALAAAAAABAAEAAAI
 function imgSrcAttrs(path) {
   return path.endsWith(".enc") ? `src="${BLANK}" data-enc="${esc(path)}"` : `src="${esc(mediaUrl(path))}"`;
 }
-// A <video> for a page or reply; encrypted ones are filled in by hydrateMedia() too.
-function videoHtml(path, cls = "") {
-  return `<video class="${cls}" controls playsinline preload="metadata" ${path.endsWith(".enc") ? `data-enc="${esc(path)}"` : `src="${esc(mediaUrl(path))}#t=0.1"`}></video>`;
+// A <video> for a page or reply, with its thumbnail as the poster; encrypted ones are filled in by hydrateMedia() too.
+function videoHtml(path, cls = "", thumb = "") {
+  const poster = !thumb ? "" : thumb.endsWith(".enc") ? `data-enc-poster="${esc(thumb)}"` : `poster="${esc(mediaUrl(thumb))}"`;
+  return `<video class="${cls}" controls playsinline preload="metadata" ${poster} ${path.endsWith(".enc") ? `data-enc="${esc(path)}"` : `src="${esc(mediaUrl(path))}#t=0.1"`}></video>`;
+}
+// When a video is picked: a thumbnail (a frame half a second in) and whether it's landscape.
+// Never fails: without a thumbnail the page just shows ▶.
+function videoInfo(file) {
+  return new Promise(resolve => {
+    const v = document.createElement("video"), url = URL.createObjectURL(file);
+    let done = false;
+    const finish = r => { if (done) return; done = true; URL.revokeObjectURL(url); resolve(r); };
+    setTimeout(() => finish({ thumb: null, wide: v.videoWidth > v.videoHeight }), 8000);
+    Object.assign(v, { muted: true, playsInline: true, preload: "auto", src: url });
+    v.setAttribute("playsinline", ""); v.setAttribute("muted", "");
+    v.addEventListener("loadedmetadata", () => { v.currentTime = Math.min(0.5, (v.duration || 1) / 2); }, { once: true });
+    v.addEventListener("seeked", () => {
+      const scale = Math.min(1, 720 / Math.max(v.videoWidth, v.videoHeight));
+      const c = document.createElement("canvas");
+      c.width = Math.round(v.videoWidth * scale); c.height = Math.round(v.videoHeight * scale);
+      try { c.getContext("2d").drawImage(v, 0, 0, c.width, c.height); } catch { return finish({ thumb: null, wide: v.videoWidth > v.videoHeight }); }
+      c.toBlob(b => finish({ thumb: b, wide: v.videoWidth > v.videoHeight }), "image/jpeg", 0.8);
+    }, { once: true });
+    v.addEventListener("error", () => finish({ thumb: null, wide: false }), { once: true });
+    v.load();
+  });
 }
 // Videos are big, so a page or reply takes one up to this size (about a minute of iPhone video).
 const VIDEO_MAX_MB = 40;
@@ -195,6 +218,11 @@ function videoTooBig(f) {
 }
 function hydrateMedia(root = document) {
   if (!CRYPTO_KEY) return;
+  $$("video[data-enc-poster]", root).forEach(v => {
+    const path = v.dataset.encPoster;
+    v.removeAttribute("data-enc-poster");
+    Vault.mediaUrl(CRYPTO_KEY, mediaUrl(path), path).then(u => { v.poster = u; }).catch(() => {});
+  });
   $$("video[data-enc]", root).forEach(v => {
     const path = v.dataset.enc;
     v.removeAttribute("data-enc");
@@ -275,6 +303,11 @@ function renderGoldieBar(list) {
   const hint = !mine ? "" : `−${Goldies.RULES.PENALTY} in <b class="gb-count" data-penalty-at="${mine.nextPenaltyAt}">${fmtLeft(Goldies.awakeMs(Date.now(), mine.nextPenaltyAt))}</b>${Goldies.isAwake(Date.now()) ? "" : " · paused, you're asleep 💤"}`;
   const st = Goldies.streak(list, PEOPLE);
   goldieList = list;
+  // Bought in the shop (shop-items.js): Goldiee's outfit, and today's backdrop on every page.
+  if (typeof currentOutfit === "function") {
+    window.goldiee?.wear?.(currentOutfit(list));
+    document.body.dataset.dayTheme = todaysTheme(list);
+  }
   el.innerHTML = `${side(s[0])}<span class="gb-mid" title="days in a row you both posted"><span class="gb-streak">${st}</span><span class="gb-lbl">day${st === 1 ? "" : "s"} together</span></span>${side(s[1])}${hint ? `<small class="gb-hint">goldies · ${hint}</small>` : ""}`;
   el.hidden = false;
   el.onclick = () => openGoldieRules(list);

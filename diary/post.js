@@ -66,7 +66,7 @@ function replyHtml(r) {
   const mine = r.by === NAME;
   let media = "";
   if (r.kind === "photo") media = `<img class="reply-img" ${imgSrcAttrs(r.media)} data-path="${esc(r.media)}" alt="a picture reply">`;
-  if (r.kind === "video") media = videoHtml(r.media, "reply-video");
+  if (r.kind === "video") media = `<div class="vbox reply-vbox ${r.shape === "wide" ? "wide" : "tall"}">${videoHtml(r.media, "", r.thumb)}</div>`;
   if (r.kind === "voice") media = `<div class="reply-voice"><button type="button" class="play" data-rplay="${esc(r.media)}" aria-label="Play">▶</button><div class="bar"><i></i></div><span class="dur">${fmtDur(r.duration)}</span></div>`;
   const remove = mine && KEY ? ` · <button type="button" class="link-btn" data-rdel="${esc(r.id)}">remove</button>` : "";
   const heart = r.hearts?.length ? `<span class="reply-heart" title="❤️ from ${esc(r.hearts.join(" & "))}">❤️</span>` : "";
@@ -267,7 +267,7 @@ function showAttach() {
   box.hidden = !(reply.photo || reply.video || reply.voice);
 }
 function resetReply() {
-  Object.assign(reply, { photo: null, photoFile: null, mirror: false, video: null, voice: null, voiceMime: "", duration: 0 });
+  Object.assign(reply, { photo: null, photoFile: null, mirror: false, video: null, vthumb: null, vshape: "", voice: null, voiceMime: "", duration: 0 });
   $("#replyPhoto").value = "";
   $("#replyAttach").hidden = true; $("#replyAttach").innerHTML = "";
   setStatus($("#replyStatus"), "");
@@ -287,7 +287,10 @@ $("#replyPhoto").addEventListener("change", async ev => {
   if (isVideoFile(file)) {
     if (videoTooBig(file)) { ev.target.value = ""; return; }
     Object.assign(reply, { voice: null, photo: null, photoFile: null, video: file });
-    return showAttach();
+    showAttach();
+    const info = await videoInfo(file);
+    if (reply.video === file) Object.assign(reply, { vthumb: info.thumb, vshape: info.wide ? "wide" : "tall" });
+    return;
   }
   try { reply.video = null; reply.voice = null; reply.photoFile = file; reply.mirror = false; reply.photo = await shrinkImage(file, 1280); showAttach(); }
   catch { toast("Couldn't open that picture. Try a JPG or PNG."); }
@@ -350,6 +353,10 @@ $("#replyForm").addEventListener("submit", async ev => {
       const res = await putFile(packed.path, packed.b64, `A reply from ${NAME}`);
       r.media = packed.path; r.mediaSha = res.content.sha;
       if (reply.voice) r.duration = Math.round(reply.duration);
+      if (reply.video) {
+        r.shape = reply.vshape || "tall";
+        if (reply.vthumb) { const t = await packMedia(`${MEDIA_DIR}${e.id}-r${r.id}-thumb.jpg`, reply.vthumb); await putFile(t.path, t.b64, `Video thumbnail from ${NAME}`); r.thumb = t.path; }
+      }
     }
     const before = myPoints(entries);
     entries = await updateIndex(list => list.map(x => x.id === e.id ? { ...x, replies: [...(x.replies || []), r] } : x), `A reply from ${NAME}`);

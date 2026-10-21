@@ -48,7 +48,23 @@ function guessHtml(e) {
 }
 // Answers to a question stay blurred until you've answered it too.
 function isLocked(e) {
-  return !!(NAME && e.prompt && !e.together && e.author !== NAME && !answeredBy(entries, NAME, e.prompt.id));
+  return !!(NAME && e.prompt && !e.together && e.author !== NAME && !answeredBy(entries, NAME, e.prompt.id) && !peeked(entries, NAME, e.prompt.id));
+}
+
+// The shop's 👀: see their answer now, without answering first.
+async function peekAnswer(qid, btn) {
+  if (!canWrite()) return;
+  const cost = SHOP.PEEK, have = myPoints(entries);
+  if (have < cost) return toast(`A peek is ${cost} goldies. You have ${have} 🪙`);
+  if (!confirm(`Spend ${cost} goldies to see ${partnerOf(NAME)}'s answer without answering first?`)) return;
+  btn.disabled = true;
+  try {
+    const buy = { id: Date.now().toString(36) + Math.random().toString(36).slice(2, 6), type: "buy", item: "peek", qid, by: NAME, at: new Date().toISOString(), cost };
+    entries = await updateIndex(list => [buy, ...list], `${NAME} peeked at an answer`);
+    renderGoldieBar(entries);
+    render();
+    toast(`👀 −${cost} goldies`);
+  } catch (err) { toast(err.message); btn.disabled = false; }
 }
 
 // When this phone last opened each page, so 💬 only shows for replies you haven't seen yet.
@@ -74,7 +90,7 @@ function cardHtml(e, full = false) {
   const binNote = e.status === "binned" ? `<div class="bin-note">🗑 deletes forever in ${binDaysLeft(e)} days</div>` : "";
   const isNew = isFresh(e.at, e.by || e.author) ? `<span class="new-ribbon">new</span>` : "";
   const locked = isLocked(e);
-  const lock = locked ? `<button class="unlock" data-q="${esc(e.prompt.id)}">🔒 answer it too to see ${esc(e.author)}'s answer</button>` : "";
+  const lock = locked ? `<div class="unlock-row"><button class="unlock" data-q="${esc(e.prompt.id)}">🔒 answer it too to see ${esc(e.author)}'s answer</button>${KEY ? `<button class="unlock peek" data-peek="${esc(e.prompt.id)}">👀 or peek for ${SHOP.PEEK} 🪙</button>` : ""}</div>` : "";
   const cls = locked ? " locked" : "";
   const common = `data-id="${esc(e.id)}" style="--r:${r}deg"`;
   const hearts = e.hearts?.length ? `<span class="heart-badge" title="❤️ from ${esc(e.hearts.join(" & "))}">❤️${e.hearts.length > 1 ? " 2" : ""}</span>` : "";
@@ -94,9 +110,12 @@ function cardHtml(e, full = false) {
   if (e.type === "video") {
     const frame = ["polaroid", "tape", "film", "heart", "stamp"].includes(e.frame) ? e.frame : "polaroid";
     const fcls = frame === "tape" ? "tape-frame" : frame;
-    const vid = e.previewSrc ? `<video src="${e.previewSrc}" muted playsinline preload="metadata"></video>`
-      : full ? videoHtml(e.media) : `<div class="vid-tile" aria-label="a video">▶</div>`;
-    return `<article class="card photo video ${fcls}${cls}" ${common}>${frame === "tape" ? tapeHtml(e, 2) : ""}${top}
+    // Framed the way it was filmed (or the way it was chosen): landscape or portrait.
+    const shape = e.shape === "wide" ? "wide" : "tall";
+    const thumb = e.previewThumb ? `<img src="${e.previewThumb}" alt="">` : e.thumb ? `<img ${imgSrcAttrs(e.thumb)} alt="">` : "";
+    const vid = full && !e.previewThumb ? `<div class="vbox ${shape}">${videoHtml(e.media, "", e.thumb)}</div>`
+      : `<div class="vid-tile ${shape}" aria-label="a video">${thumb}<span class="vid-play">▶</span></div>`;
+    return `<article class="card photo video ${shape} ${fcls}${cls}" ${common}>${frame === "tape" ? tapeHtml(e, 2) : ""}${top}
       <div class="body"><div class="wrap">${vid}</div>
       ${e.caption ? `<div class="cap">${esc(e.caption)}</div>` : ""}${guessHtml(e)}</div>${lock}${binNote}${signHtml(e)}</article>`;
   }
@@ -221,6 +240,8 @@ async function togglePlay(btn, path) {
 
 // On the wall: ▶ plays, 🔒 answers, and tapping anywhere else on a card opens it.
 book.addEventListener("click", ev => {
+  const peek = ev.target.closest("[data-peek]");
+  if (peek) return peekAnswer(peek.dataset.peek, peek);
   const unlock = ev.target.closest(".unlock");
   if (unlock) return startAnswer(questionById(unlock.dataset.q) || entries.find(x => x.prompt?.id === unlock.dataset.q)?.prompt);
   if (ev.target.closest(".card.locked")) return;
@@ -504,6 +525,11 @@ async function shrinkImage(file, max = 1600, mirror = false) {
     return await new Promise(res => c.toBlob(res, "image/jpeg", 0.85));
   } finally { URL.revokeObjectURL(url); }
 }
+// Landscape or portrait: picked for you from the video, and you can switch it.
+function setVideoShape(shape) {
+  state.vshape = shape;
+  $$("#vshapeBlock .choice").forEach(c => c.classList.toggle("on", c.dataset.v === shape));
+}
 $("#photoInput").addEventListener("change", async e => {
   const file = e.target.files[0]; if (!file) return;
   // A video goes up as it is (no shrinking); it becomes a "video" page.
@@ -512,9 +538,13 @@ $("#photoInput").addEventListener("change", async e => {
     state.video = file; state.photo = null; state.photoFile = null;
     $("#flipBtn").hidden = true; $("#photoPreview").hidden = true; $("#dropText").hidden = true;
     const v = $("#videoPreview"); v.src = URL.createObjectURL(file); v.hidden = false;
+    const info = await videoInfo(file);
+    state.vthumb = info.thumb;
+    setVideoShape(info.wide ? "wide" : "tall");
+    $("#vshapeBlock").hidden = false;
     return updatePreview();
   }
-  state.video = null; $("#videoPreview").hidden = true;
+  state.video = null; state.vthumb = null; $("#videoPreview").hidden = true; $("#vshapeBlock").hidden = true;
   try {
     state.photoFile = file; state.mirror = false;
     state.photo = await shrinkImage(file);
@@ -592,7 +622,9 @@ function updatePreview() {
   if (state.type === "photo" && state.video) {
     if (previewPhotoUrl) URL.revokeObjectURL(previewPhotoUrl);
     previewPhotoUrl = URL.createObjectURL(state.video);
-    Object.assign(draft, { type: "video", frame: state.frame, caption: f.caption.value.trim(), media: "preview.mp4", previewSrc: previewPhotoUrl });
+    if (state.vthumb && !state.vthumbUrl) state.vthumbUrl = URL.createObjectURL(state.vthumb);
+    Object.assign(draft, { type: "video", frame: state.frame, caption: f.caption.value.trim(), media: "preview.mp4", shape: state.vshape,
+      previewThumb: state.vthumbUrl || "data:image/svg+xml," + encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 4 3"><rect width="4" height="3" fill="#3a2026"/></svg>') });
   } else if (state.type === "photo") {
     if (state.photo) { if (previewPhotoUrl) URL.revokeObjectURL(previewPhotoUrl); previewPhotoUrl = URL.createObjectURL(state.photo); }
     Object.assign(draft, { frame: state.frame, caption: f.caption.value.trim(), media: "preview.jpg",
@@ -608,7 +640,9 @@ function resetComposer() {
   Object.assign(state, { stickers: [], photo: null, video: null, voice: null, voiceMime: "", duration: 0, prompt: null });
   $$("#stickerPicker button").forEach(b => b.classList.remove("on"));
   $("#photoPreview").hidden = true; $("#dropText").hidden = false; $("#photoInput").value = "";
-  $("#videoPreview").hidden = true; $("#videoPreview").removeAttribute("src");
+  $("#videoPreview").hidden = true; $("#videoPreview").removeAttribute("src"); $("#vshapeBlock").hidden = true;
+  if (state.vthumbUrl) URL.revokeObjectURL(state.vthumbUrl);
+  Object.assign(state, { vthumb: null, vthumbUrl: "", vshape: "tall" });
   state.photoFile = null; state.mirror = false; $("#flipBtn").hidden = true;
   recPreview.hidden = true; recTime.textContent = "tap to record";
 }
@@ -638,7 +672,7 @@ composer.addEventListener("submit", async e => {
     Object.assign(entry, { title: state.prompt ? "" : f.title.value.trim(), text: f.text.value.trim(), paper: state.paper });
   } else if (state.type === "photo") {
     if (!state.photo && !state.video) return setStatus(st, "Choose a picture or a video first.", true);
-    if (state.video) entry.type = "video";
+    if (state.video) Object.assign(entry, { type: "video", shape: state.vshape || "tall" });
     Object.assign(entry, { caption: f.caption.value.trim(), frame: state.frame });
   } else {
     if (!state.voice) return setStatus(st, "Record something first.", true);
@@ -657,6 +691,11 @@ composer.addEventListener("submit", async e => {
       entry.media = packed.path;
       const res = await putFile(entry.media, packed.b64, `${isVid ? "Video" : state.type === "photo" ? "Picture" : "Voice note"} from ${NAME}`);
       entry.mediaSha = res.content.sha;
+      if (isVid && state.vthumb) { // the thumbnail the wall shows
+        const t = await packMedia(`${MEDIA_DIR}${id}-thumb.jpg`, state.vthumb);
+        await putFile(t.path, t.b64, `Video thumbnail from ${NAME}`);
+        entry.thumb = t.path;
+      }
     }
     setStatus(st, "Sticking it in…");
     const before = myPoints(entries);

@@ -7,8 +7,8 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Caveat:wght@400;600&family=Cormorant+Garamond:ital,wght@0,400;0,500;1,400&family=Pinyon+Script&family=Jost:wght@300;400;500&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="diary.css?v=2026102114">
-<script src="theme.js?v=2026102114"></script>
+<link rel="stylesheet" href="diary.css?v=2026102116">
+<script src="theme.js?v=2026102116"></script>
 </head>
 <body>
 
@@ -26,6 +26,7 @@
   <nav class="sections">
     <a class="section on" href="./">📖 our diary</a>
     <a class="section" href="games.html">🎲 mini games</a>
+    <a class="section" href="shop.html">🛍 our shop</a>
   </nav>
   <div class="glass-dock">
     <button type="button" class="goldie-bar" id="goldieBar" hidden aria-label="Goldie points"></button>
@@ -93,6 +94,8 @@
         <video id="videoPreview" controls playsinline muted hidden></video>
       </label>
       <button type="button" class="flip-btn" id="flipBtn" hidden>↔ flip picture</button>
+      <div id="vshapeBlock" hidden><div class="label">show the video as</div>
+        <div class="choices" data-choice="vshape"><button type="button" class="choice" data-v="wide">▭ landscape</button><button type="button" class="choice" data-v="tall">▯ portrait</button></div></div>
       <input class="field" name="caption" placeholder="A caption" maxlength="120">
       <div class="label">frame</div>
       <div class="choices" data-choice="frame">
@@ -221,13 +224,14 @@
   </div>
 </div>
 
-<script src="vault.js?v=2026102114"></script>
-<script src="goldies.js?v=2026102114"></script>
-<script src="core.js?v=2026102114"></script>
-<script src="questions.js?v=2026102114"></script>
-<script src="goldiee.js?v=2026102114"></script>
-<script src="diary.js?v=2026102114"></script>
-<script src="post.js?v=2026102114"></script>
-<script src="calls.js?v=2026102114"></script>
+<script src="vault.js?v=2026102116"></script>
+<script src="goldies.js?v=2026102116"></script>
+<script src="core.js?v=2026102116"></script>
+<script src="questions.js?v=2026102116"></script>
+<script src="shop-items.js?v=2026102116"></script>
+<script src="goldiee.js?v=2026102116"></script>
+<script src="diary.js?v=2026102116"></script>
+<script src="post.js?v=2026102116"></script>
+<script src="calls.js?v=2026102116"></script>
 </body>
 </html>

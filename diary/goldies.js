@@ -9,6 +9,7 @@
      game:  who knows whom: +5 answering about yourself, +20 spot-on guess,
             +10 close guess (paid when the guess is judged)
      race:  a puzzle race bet goes from the loser to the winner
+     shop:  anything bought in the shop (each purchase keeps its price as `cost`)
      spend: 100 to pin one of your pictures to the love page
    Works in the browser (window.Goldies) and in Node (globalThis.Goldies).
    ========================================================== */
@@ -90,6 +91,12 @@
         }
         continue;
       }
+      // A love coupon from the shop: whoever made it happen earns a reward once the buyer says "got it".
+      if (e.type === "buy" && e.item === "coupon") {
+        if (e.thanked && e.for === name && !e.cancelled && Date.parse(e.thanked.at) >= START)
+          out.push({ at: Date.parse(e.thanked.at), pts: e.reward || 20, why: "a love coupon, made happen 💌", game: true });
+        continue;
+      }
       // "Who knows whom" pays out once the guess is judged (skipped rounds pay nothing).
       if (e.type === "kwho") {
         const v = e.verdict, at = v && Date.parse(v.at);
@@ -129,7 +136,8 @@
       if (t < now) last = Math.max(last, t); // "now" isn't activity: the clock runs from the last real post
     }
     // Every pin ever made costs its goldies, even if the picture was taken off the home screen later.
-    const spent = (entries || []).flatMap(e => [e.pin, ...(e.pinHistory || [])]).filter(p => p && p.by === name).length * RULES.PIN_COST;
+    const spent = (entries || []).flatMap(e => [e.pin, ...(e.pinHistory || [])]).filter(p => p && p.by === name).length * RULES.PIN_COST
+      + (entries || []).filter(e => e.type === "buy" && e.by === name && !e.cancelled).reduce((s, e) => s + (e.cost || 0), 0); // the shop
     // Puzzle race bets move goldies straight from the loser to the winner (sleep time or not).
     const bets = races(entries).filter(r => r.bet && (r.winner === name || r.loser === name))
       .map(r => r.winner === name ? { at: r.at, pts: r.bet, why: "won a puzzle race 🧩" } : { at: r.at, pts: -r.bet, why: "lost a puzzle race 🧩" });
@@ -143,9 +151,14 @@
       nextPenaltyIn: (RULES.GAP_MIN * MIN - sinceLast) / MIN, // awake minutes until the next −50
       nextPenaltyAt: addAwake(now, RULES.GAP_MIN * MIN - sinceLast), // the moment it lands (sleep time pauses it)
       lastActive: ev.filter(x => !x.gift).pop()?.at ?? null,
-      history: [...ev, ...penalties, ...bets].sort((a, b) => b.at - a.at),
+      history: [...ev, ...penalties, ...bets, ...shopHistory(entries, name)].sort((a, b) => b.at - a.at),
     };
   }
+
+  // Shop purchases, for the "your last goldies" list.
+  const SHOP_WHY = { outfit: "an outfit for Goldiee 🐶", theme: "a diary backdrop for the day 🎨", peek: "a peek at an answer 👀", coupon: "a love coupon 💌" };
+  const shopHistory = (entries, name) => (entries || []).filter(e => e.type === "buy" && e.by === name && !e.cancelled && e.cost)
+    .map(e => ({ at: Date.parse(e.at), pts: -e.cost, why: SHOP_WHY[e.item] || "the shop" }));
 
   // Finished puzzle races: { id, at, bet, winner, loser } (a tie or a cancelled race has no winner).
   // Each player's time is saved as { start, ms } once solved, or { gaveUp } for giving up.

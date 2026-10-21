@@ -32,6 +32,12 @@
   :root[data-theme="dark"] .goldiee-bubble b { color: #f2a7b1; }
   :root[data-theme="dark"] .goldiee-go { background: #a33a55; }
   .goldiee .frown, .goldiee .tears { display: none; }
+  .goldiee.hat .bow, .goldiee-look.hat .bow { display: none; }
+  .goldiee-look .frown, .goldiee-look .tears { display: none; }
+  .goldiee-look .lids { transform-origin: 50px 46px; transform: scaleY(0); animation: g-blink 4.5s infinite; }
+  .goldiee-look .tongue { transform-origin: 50px 62px; animation: g-pant 1.1s ease-in-out infinite; }
+  .goldiee .o-flame, .goldiee-look .o-flame { transform-origin: 13px 89px; animation: g-flicker 1.4s ease-in-out infinite; }
+  @keyframes g-flicker { 50% { transform: scale(.9, 1.08); } }
   .goldiee.crying .tongue { display: none; }
   .goldiee.crying .frown, .goldiee.crying .tears { display: inline; }
   .goldiee.crying .tear { animation: g-tear 1.3s ease-in infinite; }
@@ -62,7 +68,8 @@
     <g class="tears" fill="#8fd0ff"><path class="tear t1" d="M37 50c-1.6 3-2.4 4.8-2.4 6a2.4 2.4 0 0 0 4.8 0c0-1.2-.8-3-2.4-6z"/><path class="tear t2" d="M63 50c-1.6 3-2.4 4.8-2.4 6a2.4 2.4 0 0 0 4.8 0c0-1.2-.8-3-2.4-6z"/></g>
     <ellipse cx="31" cy="54" rx="4.5" ry="2.8" fill="#f39aa6" opacity=".55"/><ellipse cx="69" cy="54" rx="4.5" ry="2.8" fill="#f39aa6" opacity=".55"/>
     <path d="M44 21c2-4 4-5 6-5s4 1 6 5c-2-1.5-4-2-6-2s-4 .5-6 2z" fill="#e4a24b"/>
-    <circle cx="68" cy="22" r="5" fill="#d97b86"/><circle cx="76" cy="20" r="5" fill="#d97b86"/><circle cx="72" cy="22" r="2.6" fill="#6e2337"/>
+    <g class="bow"><circle cx="68" cy="22" r="5" fill="#d97b86"/><circle cx="76" cy="20" r="5" fill="#d97b86"/><circle cx="72" cy="22" r="2.6" fill="#6e2337"/></g>
+    <g class="outfit"></g>
   </svg>`;
 
   const style = document.createElement("style");
@@ -100,5 +107,15 @@
   root.querySelector(".goldiee-x").addEventListener("click", hide);
 
   const cry = on => root.classList.toggle("crying", !!on);
-  window.goldiee = { say, hide, cry };
+  // Dress her up from the shop (shop-items.js); "" takes the outfit off.
+  // (shop-items.js's consts live in the shared script scope, not on window)
+  const outfitOf = id => (typeof OUTFIT_SVG !== "undefined" && OUTFIT_SVG[id]) || "";
+  const isHat = id => !!(typeof SHOP !== "undefined" && SHOP.outfits[id] && SHOP.outfits[id].hat);
+  function wear(id) {
+    root.querySelector(".outfit").innerHTML = outfitOf(id);
+    root.classList.toggle("hat", isHat(id));
+  }
+  // Goldiee as a picture, for the shop's dressing room.
+  const look = id => `<span class="goldiee-look${isHat(id) ? " hat" : ""}">${svg.replace('<g class="outfit"></g>', `<g class="outfit">${outfitOf(id)}</g>`)}</span>`;
+  window.goldiee = { say, hide, cry, wear, look };
 })();
