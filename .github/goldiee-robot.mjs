@@ -35,6 +35,17 @@ async function load() {
 // DRY=1 prints instead of sending; NOW=<ISO time> pretends it is another moment (both for testing).
 const now = process.env.NOW ? Date.parse(process.env.NOW) : Date.now();
 const DRY = !!process.env.DRY;
+// TEST=1 (the "test" box when running the workflow by hand) sends both phones a test notification.
+if (process.env.TEST === "true" || process.env.TEST === "1") {
+  const { topics } = await load();
+  for (const name of PEOPLE) {
+    if (!topics[name]) continue;
+    const res = await fetch("https://ntfy.sh/", { method: "POST", body: JSON.stringify({
+      topic: topics[name], title: "🔔 Test from the diary", message: `Hi ${name}! If you can read this, notifications work 💌`, tags: ["love_letter"], click: DIARY_URL }) });
+    console.log(`test sent to ${name}: ${res.status}`);
+  }
+  process.exit(0);
+}
 if (!Goldies.isAwake(now)) { console.log("Night time: Goldiee is asleep too."); process.exit(0); }
 const { entries, topics } = await load();
 for (const name of PEOPLE) {
