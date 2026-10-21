@@ -609,3 +609,4 @@ textarea.field.hand { font-family: var(--hand); font-size: 24px; line-height: 1.
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { animation: none !important; transition: none !important; }
 }
+.video-open { display: block; text-align: center; margin: 12px 0; }

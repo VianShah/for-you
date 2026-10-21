@@ -198,7 +198,16 @@ function hydrateMedia(root = document) {
   $$("video[data-enc]", root).forEach(v => {
     const path = v.dataset.enc;
     v.removeAttribute("data-enc");
-    Vault.mediaUrl(CRYPTO_KEY, mediaUrl(path), path).then(u => { v.src = u + "#t=0.1"; }).catch(() => { v.replaceWith(Object.assign(document.createElement("p"), { className: "hint", textContent: "couldn't open this video" })); });
+    // Safari won't play a decrypted (blob:) video with a "#t=" on the end, so the first frame is shown by seeking instead.
+    v.addEventListener("loadedmetadata", () => { if (!v.currentTime) v.currentTime = 0.05; }, { once: true });
+    Vault.mediaUrl(CRYPTO_KEY, mediaUrl(path), path).then(u => {
+      // If this phone still can't play it, offer to open it in the phone's own player instead.
+      v.addEventListener("error", () => {
+        const a = Object.assign(document.createElement("a"), { className: "ghost video-open", href: u, target: "_blank", rel: "noopener", textContent: "▶ open the video" });
+        v.replaceWith(a);
+      }, { once: true });
+      v.src = u;
+    }).catch(() => { v.replaceWith(Object.assign(document.createElement("p"), { className: "hint", textContent: "couldn't open this video" })); });
   });
   $$("img[data-enc]", root).forEach(img => {
     const path = img.dataset.enc;
