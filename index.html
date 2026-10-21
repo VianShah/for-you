@@ -321,8 +321,9 @@
    Pictures and videos live in the "photos" folder.
    wide: true  → landscape frame,  false → portrait frame
    pos: which part stays in view ("50% 50%" = centre)
-   The strip shows FRAME_SHAPES frames; every few seconds one of
-   the visible frames softly swaps to another memory of the same shape.
+   The strip shows up to FRAME_SHAPES frames (fewer if there aren't
+   enough pictures, so none shows twice); every few seconds one of the
+   visible frames softly swaps to a memory that isn't on screen yet.
    ========================================================== */
 const MEMORIES = [
   { src: "photos/1.jpg",  tag: "BY THE SEA",      caption: "You, collecting us", wide: false },
@@ -361,25 +362,47 @@ const isVideo = m => /\.(mp4|mov|webm)$/i.test(m.src);
 /* ---------- build the frames ---------- */
 const track = document.getElementById("track");
 const panelEnd = document.getElementById("panelEnd");
-const queues = { tall: MEMORIES.filter(m => !m.wide), wide: MEMORIES.filter(m => m.wide) };
-const nextMemory = shape => { const q = queues[shape]; const m = q.shift(); q.push(m); return m; };
-FRAME_SHAPES.forEach(shape => {
-  const fig = document.createElement("figure");
-  fig.className = "frame" + (shape === "wide" ? " wide" : "");
-  fig.dataset.shape = shape;
-  fig.innerHTML = `<div class="photo"><button class="snd" hidden aria-label="Sound on">🔇</button></div><figcaption><b></b><span></span></figcaption>`;
-  track.insertBefore(fig, panelEnd);
-});
-const frames = [...track.querySelectorAll(".frame")];
+// Memories whose files are really there, by shape (filled in by loadMemories).
+const queues = { tall: [], wide: [] };
+let frames = [];
+// The next memory of this shape that isn't already in a frame (null when they all are).
+function nextMemory(shape) {
+  const q = queues[shape], on = new Set(frames.map(f => f.dataset.src));
+  for (let k = 0; k < q.length; k++) { const m = q.shift(); q.push(m); if (!on.has(m.src)) return m; }
+  return null;
+}
+const dropMemory = m => { for (const q of Object.values(queues)) { const i = q.indexOf(m); if (i >= 0) q.splice(i, 1); } };
+// As many frames as there are memories (up to FRAME_SHAPES), so no picture has to show twice.
+function buildFrames() {
+  const left = { tall: queues.tall.length, wide: queues.wide.length };
+  for (const want of FRAME_SHAPES) {
+    const other = want === "wide" ? "tall" : "wide";
+    const shape = left[want] ? want : left[other] ? other : null;
+    if (!shape) break;
+    left[shape]--;
+    const fig = document.createElement("figure");
+    fig.className = "frame" + (shape === "wide" ? " wide" : "");
+    fig.dataset.shape = shape;
+    fig.innerHTML = `<div class="photo"><button class="snd" hidden aria-label="Sound on">🔇</button></div><figcaption><b></b><span></span></figcaption>`;
+    track.insertBefore(fig, panelEnd);
+  }
+  frames = [...track.querySelectorAll(".frame")];
+}
 
 /* ---------- media: plain files, or decrypted behind our secret word ---------- */
 let vaultKey = null;
+const fileOf = m => m.src.endsWith(".enc") || !vaultKey ? m.src : m.src + ".enc";
 async function mediaSrc(m) {
   if (m.src.endsWith(".enc")) return Vault.mediaUrl(vaultKey, m.src, m.src); // a diary picture pinned with goldies
   return vaultKey ? Vault.mediaUrl(vaultKey, m.src + ".enc", m.src) : m.src;
 }
+// A memory listed above whose file hasn't been uploaded (yet) is left out.
+async function exists(m) {
+  try { return (await fetch(fileOf(m), { method: "HEAD", cache: "no-store" })).ok; } catch { return true; }
+}
 // Puts a memory into a frame, fading it in over whatever was there.
-async function show(fig, m, i, tries = 0) {
+async function show(fig, m, i) {
+  fig.dataset.src = m.src; // claimed now, so no other frame picks it meanwhile
   const box = fig.querySelector(".photo");
   const video = isVideo(m);
   const el = video ? document.createElement("video") : new Image();
@@ -398,8 +421,8 @@ async function show(fig, m, i, tries = 0) {
     onScroll();
   };
   el.addEventListener(video ? "loadeddata" : "load", ready, { once: true });
-  // A memory whose file isn't there (yet) is skipped quietly; the frame shows the next one.
-  const skip = () => { el.remove(); if (tries < queues[fig.dataset.shape].length) show(fig, nextMemory(fig.dataset.shape), i, tries + 1); };
+  // A file that won't open is dropped for good; the frame shows another memory instead.
+  const skip = () => { el.remove(); dropMemory(m); const n = nextMemory(fig.dataset.shape); if (n) show(fig, n, i); };
   el.addEventListener("error", skip, { once: true });
   box.insertBefore(el, box.querySelector(".snd")); // on top of the old one, so it fades in over it
   try { el.src = await mediaSrc(m); } catch { return skip(); }
@@ -413,38 +436,41 @@ track.addEventListener("click", e => {
   v.muted = !v.muted; b.textContent = v.muted ? "🔇" : "🔊";
 });
 
-// Every few seconds, one frame that's on screen swaps to the next memory of its shape
-// (never one whose video someone is listening to).
+// Every few seconds, one frame that's on screen swaps to a memory of its shape that isn't
+// showing anywhere else (never one whose video someone is listening to).
 function rotate() {
   if (document.hidden) return;
   const onScreen = frames.filter(f => { const r = f.getBoundingClientRect(); return r.right > 0 && r.left < innerWidth && r.bottom > 0 && r.top < innerHeight; });
   const pool = onScreen.filter(f => ![...f.querySelectorAll("video.m")].some(v => !v.muted));
-  if (!pool.length) return;
-  const fig = pool[Math.random() * pool.length | 0];
-  show(fig, nextMemory(fig.dataset.shape), frames.indexOf(fig));
+  for (const fig of pool.sort(() => Math.random() - .5)) {
+    const m = nextMemory(fig.dataset.shape);
+    if (m) return show(fig, m, frames.indexOf(fig));
+  }
 }
 
 // Pictures from the diary that one of you pinned with goldies 🏠 join the strip, first in line.
-async function addPinnedPictures() {
+async function pinnedPictures() {
   try {
     const r = await fetch("diary/entries.json?t=" + Date.now(), { cache: "no-store" });
-    if (!r.ok) return;
+    if (!r.ok) return [];
     let list = await r.json();
     if (list && list.enc) list = vaultKey ? JSON.parse(await Vault.decryptText(vaultKey, list.enc)) : [];
-    const pinned = (Array.isArray(list) ? list : []).filter(e => e.pin && !e.status && e.type === "photo" && e.media)
-      .sort((a, b) => Date.parse(b.pin.at) - Date.parse(a.pin.at));
-    for (const e of pinned.reverse()) {
-      const m = { src: e.media, tag: `PINNED BY ${e.pin.by.toUpperCase()}`, caption: e.caption || "a favourite from our diary", wide: !!e.pin.wide };
-      queues[m.wide ? "wide" : "tall"].unshift(m);
-    }
-  } catch {}
+    return (Array.isArray(list) ? list : []).filter(e => e.pin && !e.status && e.type === "photo" && e.media)
+      .sort((a, b) => Date.parse(b.pin.at) - Date.parse(a.pin.at))
+      .map(e => ({ src: e.media, tag: `PINNED BY ${e.pin.by.toUpperCase()}`, caption: e.caption || "a favourite from our diary", wide: !!e.pin.wide }));
+  } catch { return []; }
 }
 
 (async function loadMemories() {
   const vault = window.Vault && await Vault.fetchVault("diary/vault.json");
   if (vault) vaultKey = await Vault.cached(vault) || await Vault.lockScreen(vault, { title: "Hey you.", hint: "Type our secret word to come in." });
-  await addPinnedPictures();
-  frames.forEach((f, i) => show(f, nextMemory(f.dataset.shape), i));
+  const seen = new Set();
+  const all = [...await pinnedPictures(), ...MEMORIES].filter(m => !seen.has(m.src) && seen.add(m.src));
+  const there = await Promise.all(all.map(exists));
+  all.filter((m, k) => there[k]).forEach(m => queues[m.wide ? "wide" : "tall"].push(m));
+  buildFrames();
+  sizeGallery(); onScroll();
+  frames.forEach((f, i) => { const m = nextMemory(f.dataset.shape); if (m) show(f, m, i); });
   setInterval(rotate, ROTATE_EVERY);
 })();
 const gallery = document.getElementById("gallery");
