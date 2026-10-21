@@ -21,7 +21,7 @@
     TEXT: 5, VOICE: 5, LONG: 10, LONG_CHARS: 200, PHOTO: 15,
     CALL: 5, CALL_BLOCK_MIN: 15,        // +5 for every 15 minutes on a call together
     KW_ANSWER: 5, KW_SPOT: 20, KW_CLOSE: 10, // "who knows whom": answering about yourself / a spot-on / a close guess
-    PIN_COST: 100,
+    PIN_COST: 100, PIN_DAYS: 3,         // a pinned picture stays on the love page for 3 days
     RACE_BETS: [0, 50, 150],            // what a puzzle race can be played for (winner takes it from the loser)
     WELCOME: 50,                       // a starting gift, so one quiet morning doesn't make Goldiee cry
     CRY_BELOW: 0,                       // Goldiee cries when a score drops below this
@@ -175,5 +175,7 @@
     return n;
   }
 
-  globalThis.Goldies = { RULES, awakeMinutes, awakeMs, addAwake, isAwake, events, score, streak, textPoints, races };
+  // Is a pin still on the love page? ({ at } from entry.pin)
+  const pinLive = (pin, now = Date.now()) => !!pin && now - Date.parse(pin.at) < RULES.PIN_DAYS * DAY * MIN;
+  globalThis.Goldies = { pinLive, RULES, awakeMinutes, awakeMs, addAwake, isAwake, events, score, streak, textPoints, races };
 })();

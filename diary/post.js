@@ -44,8 +44,9 @@ function renderPost() {
   if (e.type === "note") a.push(`<button type="button" class="ghost" data-act="copy">📋 copy text</button>`);
   // Spend goldies to put a picture on the love page's photo strip.
   if (KEY && NAME && e.type === "photo" && !e.status) {
-    a.push(e.pin ? `<button type="button" class="ghost pinned" data-act="unpin">🏠 on the home screen · remove</button>`
-                 : `<button type="button" class="ghost" data-act="pin">🏠 add to home · ${Goldies.RULES.PIN_COST} 🪙</button>`);
+    const until = e.pin && new Date(Date.parse(e.pin.at) + Goldies.RULES.PIN_DAYS * 864e5).toLocaleString("en-GB", { weekday: "short", hour: "numeric", minute: "2-digit", hour12: true }).toLowerCase();
+    a.push(Goldies.pinLive(e.pin) ? `<button type="button" class="ghost pinned" data-act="unpin">🏠 on the home screen till ${until} · remove</button>`
+                 : `<button type="button" class="ghost" data-act="pin">🏠 ${e.pin ? "back on" : "add to"} home for ${Goldies.RULES.PIN_DAYS} days · ${Goldies.RULES.PIN_COST} 🪙</button>`);
   }
   if (KEY) {
     if (!e.status) a.push(`<button type="button" class="ghost" data-act="archive">🗂 archive</button>`, `<button type="button" class="ghost" data-act="bin">🗑 remove</button>`);
@@ -175,11 +176,12 @@ $("#postBack").addEventListener("click", async ev => {
     if (act === "pin") {
       const have = myPoints(entries), cost = Goldies.RULES.PIN_COST;
       if (have < cost) return toast(`You need ${cost} goldies for this. You have ${have} 🪙`);
-      if (!confirm(`Spend ${cost} goldies to put this picture on the love page?`)) return;
+      if (!confirm(`Spend ${cost} goldies to put this picture on the love page for ${Goldies.RULES.PIN_DAYS} days?`)) return;
       const img = $("#postCard img");
       const wide = !!(img && img.naturalWidth > img.naturalHeight);
-      entries = await updateIndex(list => list.map(x => x.id === e.id ? { ...x, pin: { by: NAME, at: nowIso(), wide } } : x), `${NAME} pinned a picture to the home screen`);
-      notifyPartner(`${NAME} pinned a picture to the home screen 🏠`, "It's in the photo strip on the love page now.");
+      // An expired pin moves to the history (it was paid for), and the new one starts its own 3 days.
+      entries = await updateIndex(list => list.map(x => x.id === e.id ? { ...x, pin: { by: NAME, at: nowIso(), wide }, pinHistory: x.pin ? [...(x.pinHistory || []), x.pin] : x.pinHistory } : x), `${NAME} pinned a picture to the home screen`);
+      notifyPartner(`${NAME} pinned a picture to the home screen 🏠`, `It's in the photo strip on the love page for ${Goldies.RULES.PIN_DAYS} days.`);
       render(); renderPost();
       return toast(`On the home screen 🏠  −${cost} 🪙`);
     }

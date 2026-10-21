@@ -7,7 +7,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,400;0,500;1,400;1,500&family=Pinyon+Script&family=Jost:wght@300;400&display=swap" rel="stylesheet">
-<script src="diary/theme.js?v=2026102112"></script>
+<script src="diary/theme.js?v=2026102113"></script>
 <style>
   :root {
     --cream: #fbf5ef;
@@ -314,7 +314,7 @@
 
 <footer>made with every bit of me</footer>
 
-<script src="diary/vault.js?v=2026102112"></script>
+<script src="diary/vault.js?v=2026102113"></script>
 <script>
 /* ==========================================================
    EDIT HERE: every memory the photo strip rotates through.
@@ -428,9 +428,15 @@ async function show(fig, m, i) {
   try { el.src = await mediaSrc(m); } catch { return skip(); }
   if (video) el.play().catch(() => {});
 }
-// Tap a video's speaker to hear it.
+// Tap a video's speaker to hear it; tap anywhere else on a picture to skip to the next one.
 track.addEventListener("click", e => {
-  const b = e.target.closest(".snd"); if (!b) return;
+  const b = e.target.closest(".snd");
+  if (!b) {
+    const fig = e.target.closest(".frame"); if (!fig) return;
+    const m = nextMemory(fig.dataset.shape) || nextMemory(fig.dataset.shape === "wide" ? "tall" : "wide");
+    if (m) show(fig, m, frames.indexOf(fig));
+    return;
+  }
   const v = b.parentElement.querySelector("video.m");
   if (!v) return;
   v.muted = !v.muted; b.textContent = v.muted ? "🔇" : "🔊";
@@ -448,14 +454,16 @@ function rotate() {
   }
 }
 
-// Pictures from the diary that one of you pinned with goldies 🏠 join the strip, first in line.
+// Pictures from the diary that one of you pinned with goldies 🏠 join the strip, first in line,
+// for 3 days from when they were pinned.
+const PIN_DAYS = 3;
 async function pinnedPictures() {
   try {
     const r = await fetch("diary/entries.json?t=" + Date.now(), { cache: "no-store" });
     if (!r.ok) return [];
     let list = await r.json();
     if (list && list.enc) list = vaultKey ? JSON.parse(await Vault.decryptText(vaultKey, list.enc)) : [];
-    return (Array.isArray(list) ? list : []).filter(e => e.pin && !e.status && e.type === "photo" && e.media)
+    return (Array.isArray(list) ? list : []).filter(e => e.pin && !e.status && e.type === "photo" && e.media && Date.now() - Date.parse(e.pin.at) < PIN_DAYS * 864e5)
       .sort((a, b) => Date.parse(b.pin.at) - Date.parse(a.pin.at))
       .map(e => ({ src: e.media, tag: `PINNED BY ${e.pin.by.toUpperCase()}`, caption: e.caption || "a favourite from our diary", wide: !!e.pin.wide }));
   } catch { return []; }
