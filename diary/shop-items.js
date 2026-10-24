@@ -174,10 +174,36 @@ function bouquetSvg(flowers, wrap = "kraft", layout = null) {
   const [w1, w2] = SHOP.WRAPS[wrap] || SHOP.WRAPS.kraft;
   const stems = pos.map(p => `<path d="M${p.x.toFixed(1)} ${p.y.toFixed(1)} Q${((p.x + 100) / 2).toFixed(1)} ${(p.y + 60).toFixed(1)} 100 196" stroke="#5a9a4a" stroke-width="2" fill="none"/>`).join("");
   const leaves = n ? `<path d="M100 150q-34-6-40-34q26 6 40 34zM100 150q34-6 40-34q-26 6-40 34z" fill="#6aa84f"/>` : "";
-  const flowersSvg = pos.sort((a, b) => a.y - b.y).map(p => `<g data-i="${p.i}" transform="translate(${p.x.toFixed(1)} ${p.y.toFixed(1)}) scale(${p.s})">${flowerHead(p.id)}</g>`).join("");
-  return `<svg class="bouquet" viewBox="0 0 200 240" aria-hidden="true">${stems}${leaves}
-    <path d="M46 128 L100 234 L154 128 Q100 146 46 128z" fill="${w1}"/><path d="M46 128 L100 234 L84 136z" fill="${w2}" opacity=".7"/>
+  const flowersSvg = pos.sort((a, b) => a.y - b.y).map(p => `<g data-i="${p.i}" transform="translate(${p.x.toFixed(1)} ${p.y.toFixed(1)}) scale(${p.s})"><g class="bq-head" style="--k:${p.i};--dx:${Math.round((rand(p.id + p.i, 1) - .5) * 260)}px;--dy:${-Math.round(160 + rand(p.id + p.i, 2) * 140)}px;--r:${Math.round((rand(p.id + p.i, 3) - .5) * 540)}deg">${flowerHead(p.id)}</g></g>`).join("");
+  return `<svg class="bouquet" viewBox="0 0 200 240" aria-hidden="true"><g class="bq-stems">${stems}${leaves}</g>
+    <g class="bq-cone"><path d="M46 128 L100 234 L154 128 Q100 146 46 128z" fill="${w1}"/><path d="M46 128 L100 234 L84 136z" fill="${w2}" opacity=".7"/></g>
     ${flowersSvg}
-    <path d="M100 196c-12-10-24-8-22 0s14 4 22 0zm0 0c12-10 24-8 22 0s-14 4-22 0z" fill="#d97b86"/><path d="M98 198l-8 18M102 198l8 18" stroke="#d97b86" stroke-width="3" stroke-linecap="round"/><circle cx="100" cy="197" r="4" fill="#c4566a"/></svg>`;
+    <g class="bq-ribbon"><path d="M100 196c-12-10-24-8-22 0s14 4 22 0zm0 0c12-10 24-8 22 0s-14 4-22 0z" fill="#d97b86"/><path d="M98 198l-8 18M102 198l8 18" stroke="#d97b86" stroke-width="3" stroke-linecap="round"/><circle cx="100" cy="197" r="4" fill="#c4566a"/></g></svg>`;
 }
 const flowersFor = (list, name) => buys(list, "flowers").filter(e => e.for === name).sort((a, b) => Date.parse(b.at) - Date.parse(a.at));
+
+// Receiving flowers: a full-screen moment. Petals rain down, the paper rises, each flower
+// flies into the place the sender chose, the ribbon ties, and their card slides in.
+function flowerReveal(f, forName = NAME) {
+  if (!f || document.querySelector(".bloom")) return;
+  const n = (f.layout?.length) || flowerCount(f.flowers);
+  const settle = 1.1 + n * .12 + .8; // seconds until the last flower has landed
+  const kinds = Object.keys(f.flowers || {}).length ? Object.keys(f.flowers) : ["rose"];
+  const petals = Array.from({ length: 34 }, (_, i) => {
+    const k = kinds[i % kinds.length];
+    return `<i class="petal" style="left:${(rand(f.id, i) * 100).toFixed(1)}%;--d:${(rand(f.id, i + 50) * 1.6).toFixed(2)}s;--t:${(2.4 + rand(f.id, i + 99) * 1.8).toFixed(2)}s;--s:${(.55 + rand(f.id, i + 7) * .7).toFixed(2)};--x:${Math.round((rand(f.id, i + 3) - .5) * 120)}px"><svg viewBox="-16 -16 32 32">${flowerHead(k)}</svg></i>`;
+  }).join("");
+  const back = document.createElement("div");
+  back.className = "sheet-back bloom";
+  back.style.setProperty("--rb", `${settle - .4}s`); // the ribbon ties once the flowers are in
+  back.innerHTML = `<div class="petals">${petals}</div>
+    <div class="bloom-card">
+      <div class="bloom-title"><small>for you, ${esc(forName || "")}</small><b>flowers from ${esc(f.by)}</b></div>
+      <div class="bloom-bouquet">${bouquetSvg(f.flowers, f.wrap, f.layout)}</div>
+      ${f.note ? `<p class="bloom-note" style="--nd:${settle}s">“${esc(f.note)}”</p>` : ""}
+      <button class="save bloom-btn" data-close style="--nd:${settle + (f.note ? .5 : 0)}s">thank you 💐</button>
+    </div>`;
+  back.addEventListener("click", ev => { if (ev.target.closest("[data-close]")) back.remove(); });
+  document.body.appendChild(back);
+  setTimeout(() => { const r = back.querySelector(".bloom-bouquet")?.getBoundingClientRect(); if (r && window.burst) burst(r.left + r.width / 2, r.top + r.height / 3, 26); }, settle * 1000);
+}

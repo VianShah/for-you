@@ -230,14 +230,7 @@ function openBouquetBuilder() {
   });
   draw();
 }
-function showFlowers(f) {
-  if (!f) return;
-  const back = document.createElement("div");
-  back.className = "sheet-back";
-  back.innerHTML = `<div class="sheet small surprise-card">${bouquetSvg(f.flowers, f.wrap, f.layout)}<small>flowers from ${esc(f.by)}</small>${f.note ? `<p>${esc(f.note)}</p>` : ""}<button class="save" data-close>💐</button></div>`;
-  back.addEventListener("click", ev => { if (ev.target === back || ev.target.closest("[data-close]")) back.remove(); });
-  document.body.appendChild(back);
-}
+const showFlowers = f => flowerReveal(f, f?.for); // replay the moment from "flowers you've been sent"
 
 function renderShop() { renderWardrobe(); renderCoupons(); renderThemes(); renderExtras(); }
 

@@ -180,11 +180,10 @@ function showSurprise() {
   const s = [...surprisesFor(entries, NAME), ...flowersFor(entries, NAME)].sort((a, b) => Date.parse(a.at) - Date.parse(b.at)).find(e => !seen.includes(e.id));
   if (!s) return;
   store.set("surprises-seen", [s.id, ...seen.filter(Boolean)].slice(0, 100).join(","));
+  if (s.item === "flowers") return flowerReveal(s);
   const back = document.createElement("div");
   back.className = "sheet-back surprise-pop";
-  back.innerHTML = s.item === "flowers"
-    ? `<div class="sheet small surprise-card">${bouquetSvg(s.flowers, s.wrap, s.layout)}<small>flowers from ${esc(s.by)}</small>${s.note ? `<p>${esc(s.note)}</p>` : ""}<button class="save" data-close>thank you 💐</button></div>`
-    : `<div class="sheet small surprise-card"><div class="surprise-look">${window.goldiee?.look ? goldiee.look(currentOutfit(entries)) : "🐶"}</div>
+  back.innerHTML = `<div class="sheet small surprise-card"><div class="surprise-look">${window.goldiee?.look ? goldiee.look(currentOutfit(entries)) : "🐶"}</div>
     <small>a surprise from ${esc(s.by)}</small><p>${esc(s.note || "Just thinking of you ♥")}</p><button class="save" data-close>aww ♥</button></div>`;
   back.addEventListener("click", ev => { if (ev.target === back || ev.target.closest("[data-close]")) back.remove(); });
   document.body.appendChild(back);

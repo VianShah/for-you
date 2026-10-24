@@ -421,7 +421,42 @@ function syncScrollLock() {
     frozenAt = null;
   }
 }
-new MutationObserver(syncScrollLock).observe(document.body, { subtree: true, childList: true, attributes: true, attributeFilter: ["hidden"] });
+new MutationObserver(() => { syncScrollLock(); syncHistory(); }).observe(document.body, { subtree: true, childList: true, attributes: true, attributeFilter: ["hidden"] });
+
+/* ---------- the phone's back gesture closes popups ---------- */
+// Each open popup adds a step to the browser history, so swiping back (or the back
+// button) closes the popup on top instead of leaving the diary.
+let overlayDepth = 0, popsToIgnore = 0;
+const openOverlays = () => $$(".sheet-back, .lightbox").filter(el => !el.hidden && el.isConnected);
+function syncHistory() {
+  const n = openOverlays().length;
+  while (overlayDepth < n) { overlayDepth++; history.pushState({ overlay: overlayDepth }, ""); }
+  while (overlayDepth > n) { overlayDepth--; popsToIgnore++; history.back(); } // closed with ✕: tidy the step away
+}
+addEventListener("popstate", () => {
+  if (popsToIgnore) { popsToIgnore--; return; }
+  const top = openOverlays().pop();
+  if (!top) { overlayDepth = 0; return; }
+  overlayDepth--;
+  const close = top.querySelector("[data-close], [data-race-close]");
+  if (close) close.click();
+  else if (top.id === "lightbox") top.hidden = true;
+  else if (top.matches(".call-ask")) { overlayDepth++; history.pushState({ overlay: overlayDepth }, ""); } // needs an answer
+  else top.remove();
+});
+
+/* ---------- keep popups above the phone's keyboard ---------- */
+// iPhones don't shrink the page when the keyboard opens, so popups are sized to the part
+// of the screen you can actually see, and what you're typing stays in view.
+if (window.visualViewport) {
+  const vv = visualViewport, root = document.documentElement;
+  const fit = () => { root.style.setProperty("--vvh", `${vv.height}px`); root.style.setProperty("--vvtop", `${vv.offsetTop}px`); };
+  vv.addEventListener("resize", fit); vv.addEventListener("scroll", fit); fit();
+}
+document.addEventListener("focusin", e => {
+  if (!e.target.matches?.("textarea, input") || !e.target.closest(".sheet")) return;
+  setTimeout(() => e.target.scrollIntoView({ block: "nearest", behavior: "smooth" }), 350);
+});
 
 /* ---------- small helpers ---------- */
 function hash(str) { let h = 2166136261; for (const c of String(str)) h = Math.imul(h ^ c.charCodeAt(0), 16777619); return h >>> 0; }
