@@ -25,7 +25,7 @@
     PIN_COST: 100, PIN_DAYS: 3,         // a pinned picture stays on the love page for 3 days
     RACE_BETS: [0, 50, 150],            // what a puzzle race can be played for (winner takes it from the loser)
     // Goldies added by hand (not earned in the diary): { name: [{ at, pts, why }] }.
-    BONUS: { Vian: [{ at: "2026-10-24T15:47:00Z", pts: 2000, why: "a bonus of 2000 goldies 🎉" }] },
+    BONUS: { Vian: [{ at: "2026-10-24T15:47:00Z", pts: 1180, why: "a bonus 🎉" }] }, // set so Vian was back at 290 (25 Oct)
     CALLER: 70, CALLER_FROM: "2026-10-24T15:47:00Z", // whoever starts a call from the diary gets 70 extra (calls from here on)
     WELCOME: 50,                       // a starting gift, so one quiet morning doesn't make Goldiee cry
     CRY_BELOW: 0,                       // Goldiee cries when a score drops below this
