@@ -81,6 +81,31 @@ const isFresh = (at, by) => !!(NAME && at && new Date(at).getTime() > lastSeen &
 const BIN_DAYS = 100;
 const binDaysLeft = e => Math.max(0, Math.ceil(BIN_DAYS - (Date.now() - new Date(e.binnedAt).getTime()) / 864e5));
 
+// Several pictures on one page: swipe through them (on the wall too), with arrows, dots and a count.
+function galleryHtml(paths, caption) {
+  const n = paths.length;
+  return `<div class="gallery" data-gallery><div class="gal-track">${paths.map((m, i) => `<figure><img ${imgSrcAttrs(m)} data-path="${esc(m)}" alt="${esc(caption || "a picture of us")} (${i + 1} of ${n})"${i ? ' loading="lazy"' : ""}></figure>`).join("")}</div>
+    <button type="button" class="gal-arrow prev" data-gal="-1" aria-label="previous picture" hidden>‹</button><button type="button" class="gal-arrow next" data-gal="1" aria-label="next picture">›</button>
+    <span class="gal-count">1 / ${n}</span><div class="gal-dots">${paths.map((_, i) => `<i class="${i ? "" : "on"}"></i>`).join("")}</div></div>`;
+}
+// Arrows scroll one picture; they never open the page underneath.
+document.addEventListener("click", e => {
+  const a = e.target.closest("[data-gal]"); if (!a) return;
+  e.stopPropagation(); e.preventDefault();
+  const track = a.closest(".gallery").querySelector(".gal-track");
+  track.scrollBy({ left: Number(a.dataset.gal) * track.clientWidth, behavior: reduceMotion ? "auto" : "smooth" });
+}, true);
+// Keep the dots, the count and the arrows in step with the swiping.
+document.addEventListener("scroll", e => {
+  const track = e.target.classList?.contains("gal-track") && e.target; if (!track) return;
+  const g = track.closest(".gallery"), n = track.children.length, i = Math.round(track.scrollLeft / Math.max(1, track.clientWidth));
+  g.querySelector(".gal-count").textContent = `${i + 1} / ${n}`;
+  g.querySelectorAll(".gal-dots i").forEach((d, k) => d.classList.toggle("on", k === i));
+  g.querySelector(".prev").hidden = i === 0;
+  g.querySelector(".next").hidden = i >= n - 1;
+  g.classList.add("swiped");
+}, true);
+
 // full: the opened page (plays the video); on the wall a video is just a tile until you open it.
 function cardHtml(e, full = false) {
   const r = (rand(e.id, "r") * 6 - 3).toFixed(2);
@@ -104,8 +129,8 @@ function cardHtml(e, full = false) {
     const frame = ["polaroid", "tape", "film", "heart", "stamp"].includes(e.frame) ? e.frame : "polaroid";
     const fcls = frame === "tape" ? "tape-frame" : frame;
     return `<article class="card photo ${fcls}${cls}" ${common}>${frame === "tape" ? tapeHtml(e, 2) : ""}${top}
-      <div class="body"><div class="wrap">${full && e.more?.length && !e.previewSrc
-        ? `<div class="gallery">${[e.media, ...e.more].map((m, i, all) => `<figure><img ${imgSrcAttrs(m)} data-path="${esc(m)}" alt="${esc(e.caption || "a picture of us")} (${i + 1} of ${all.length})"><span>${i + 1} / ${all.length}</span></figure>`).join("")}</div>`
+      <div class="body"><div class="wrap">${e.more?.length && !e.previewSrc
+        ? galleryHtml([e.media, ...e.more], e.caption)
         : `<img ${e.previewSrc ? `src="${e.previewSrc}"` : imgSrcAttrs(e.media)} alt="${esc(e.caption || "a picture of us")}" loading="lazy">${e.more?.length ? `<span class="photo-count-badge">📷 ${e.more.length + 1}</span>` : ""}`}</div>
       ${e.caption ? `<div class="cap">${esc(e.caption)}</div>` : ""}${guessHtml(e)}</div>${lock}${binNote}${signHtml(e)}</article>`;
   }
@@ -589,16 +614,48 @@ function setVideoShape(shape) {
   state.vshape = shape;
   $$("#vshapeBlock .choice").forEach(c => c.classList.toggle("on", c.dataset.v === shape));
 }
+/* pictures: from the camera (several in one go) or from your photos, then tick which to send */
 const MAX_PHOTOS = 10; // pictures on one page
+state.picks = []; // { src: the original, blob: shrunk for upload, url, on: will be sent }
+function syncPicks() {
+  const on = state.picks.filter(p => p.on);
+  state.photos = on.map(p => p.blob);
+  state.photo = state.photos[0] || null;
+  const tray = $("#photoTray");
+  tray.hidden = !state.picks.length;
+  tray.innerHTML = state.picks.map((p, i) => `<button type="button" class="tray-pic${p.on ? " on" : ""}" data-pick="${i}" aria-label="picture ${i + 1}${p.on ? ", will be sent" : ", left out"}"><img src="${p.url}" alt=""><span class="tray-tick">${p.on ? on.indexOf(p) + 1 : ""}</span></button>`).join("");
+  $("#trayHint").hidden = !state.picks.length;
+  $("#trayHint").textContent = state.picks.length > 1 ? `${on.length} of ${state.picks.length} will be sent · tap a picture to leave it out or put it back` : "tap the picture to leave it out";
+  $("#flipBtn").hidden = !on.length;
+  updatePreview();
+}
+async function addPics(srcs) {
+  if (state.video) { state.video = null; state.vthumb = null; $("#videoPreview").hidden = true; $("#vshapeBlock").hidden = true; }
+  for (const src of srcs) {
+    if (state.picks.length >= 30) { toast("That's plenty for one page 📷"); break; }
+    try {
+      const blob = await shrinkImage(src, 1600, state.mirror);
+      state.picks.push({ src, blob, url: URL.createObjectURL(blob), on: state.picks.filter(p => p.on).length < MAX_PHOTOS });
+    } catch { toast("Couldn't open one of those pictures."); }
+  }
+  syncPicks();
+}
+$("#photoTray").addEventListener("click", e => {
+  const b = e.target.closest("[data-pick]"); if (!b) return;
+  const p = state.picks[Number(b.dataset.pick)];
+  if (!p.on && state.picks.filter(x => x.on).length >= MAX_PHOTOS) return toast(`Up to ${MAX_PHOTOS} pictures on one page`);
+  p.on = !p.on;
+  syncPicks();
+});
 $("#photoInput").addEventListener("change", async e => {
-  const files = [...e.target.files]; if (!files.length) return;
-  const file = files.find(isVideoFile) && files.length === 1 ? files[0] : files.find(f => !isVideoFile(f)) || files[0];
-  $("#photoCount").hidden = true;
+  const files = [...e.target.files]; e.target.value = ""; if (!files.length) return;
   // A video goes up as it is (no shrinking); it becomes a "video" page, on its own.
-  if (isVideoFile(file)) {
-    if (videoTooBig(file)) { e.target.value = ""; return; }
-    state.video = file; state.photo = null; state.photoFile = null;
-    $("#flipBtn").hidden = true; $("#photoPreview").hidden = true; $("#dropText").hidden = true;
+  if (files.length === 1 && isVideoFile(files[0])) {
+    const file = files[0];
+    if (videoTooBig(file)) return;
+    state.picks = []; syncPicks();
+    state.video = file; state.photo = null;
+    $("#flipBtn").hidden = true;
     const v = $("#videoPreview"); v.src = URL.createObjectURL(file); v.hidden = false;
     const info = await videoInfo(file);
     state.vthumb = info.thumb;
@@ -606,34 +663,67 @@ $("#photoInput").addEventListener("change", async e => {
     $("#vshapeBlock").hidden = false;
     return updatePreview();
   }
-  state.video = null; state.vthumb = null; $("#videoPreview").hidden = true; $("#vshapeBlock").hidden = true;
-  // One picture or several: they all go on the same page (videos need a page of their own).
   const pics = files.filter(f => !isVideoFile(f));
   if (pics.length < files.length) toast("Videos go on a page of their own, so just the pictures this time.");
-  if (pics.length > MAX_PHOTOS) toast(`Up to ${MAX_PHOTOS} pictures on one page, so the first ${MAX_PHOTOS}.`);
-  try {
-    state.photoFiles = pics.slice(0, MAX_PHOTOS); state.photoFile = state.photoFiles[0]; state.mirror = false;
-    state.photos = await Promise.all(state.photoFiles.map(f => shrinkImage(f)));
-    state.photo = state.photos[0];
-    $("#flipBtn").hidden = false;
-    $("#flipBtn").textContent = state.photos.length > 1 ? "↔ flip the pictures" : "↔ flip picture";
-    updatePreview();
-    const prev = $("#photoPreview");
-    prev.src = URL.createObjectURL(state.photo); prev.hidden = false;
-    $("#dropText").hidden = true;
-    $("#photoCount").hidden = state.photos.length < 2;
-    $("#photoCount").textContent = `📷 ${state.photos.length} pictures`;
-  } catch { toast("Couldn't open that picture. Try a JPG or PNG."); }
+  addPics(pics);
 });
 
-// ↔ flip the chosen picture before it's saved.
+// The diary's own camera: keep tapping the shutter, every shot lands in the tray.
+let camFacing = "environment";
+$("#camBtn").addEventListener("click", openCamera);
+async function openCamera() {
+  const back = document.createElement("div");
+  back.className = "sheet-back multicam";
+  back.innerHTML = `<div class="mc-stage"><video playsinline muted autoplay></video><div class="mc-flash"></div>
+      <button type="button" class="mc-close" data-close aria-label="Done">✕</button></div>
+    <div class="mc-strip"></div>
+    <div class="mc-bar"><button type="button" class="mc-flip" aria-label="Switch camera">🔄</button>
+      <button type="button" class="mc-shutter" aria-label="Take a picture"><i></i></button>
+      <button type="button" class="mc-done" data-close>done</button></div>`;
+  document.body.appendChild(back);
+  const video = $("video", back), shots = [];
+  let stream = null;
+  const stop = () => stream?.getTracks().forEach(t => t.stop());
+  async function start() {
+    stop();
+    try {
+      stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: camFacing, width: { ideal: 1920 }, height: { ideal: 1920 } }, audio: false });
+      video.srcObject = stream; video.classList.toggle("mirror", camFacing === "user");
+      await video.play().catch(() => {});
+    } catch { back.remove(); toast("The camera didn't open. Allow camera access, or use “your photos”."); }
+  }
+  const strip = () => {
+    $(".mc-strip", back).innerHTML = shots.map(s => `<img src="${s.url}" alt="">`).join("");
+    $(".mc-done", back).textContent = shots.length ? `done · ${shots.length} 📷` : "done";
+    $(".mc-strip", back).scrollLeft = 1e6;
+  };
+  back.addEventListener("click", async ev => {
+    if (ev.target.closest(".mc-shutter")) {
+      if (!video.videoWidth) return;
+      const c = document.createElement("canvas"); c.width = video.videoWidth; c.height = video.videoHeight;
+      const ctx = c.getContext("2d");
+      if (camFacing === "user") { ctx.translate(c.width, 0); ctx.scale(-1, 1); } // like the preview, the way you see yourself
+      ctx.drawImage(video, 0, 0);
+      const blob = await new Promise(r => c.toBlob(r, "image/jpeg", .9));
+      shots.push({ blob, url: URL.createObjectURL(blob) });
+      const f = $(".mc-flash", back); f.classList.remove("go"); void f.offsetWidth; f.classList.add("go");
+      return strip();
+    }
+    if (ev.target.closest(".mc-flip")) { camFacing = camFacing === "user" ? "environment" : "user"; return start(); }
+    if (ev.target.closest("[data-close]")) {
+      stop(); back.remove();
+      if (shots.length) addPics(shots.map(s => s.blob));
+    }
+  });
+  start(); strip();
+}
+
+// ↔ flip the chosen pictures before they're saved (front-camera selfies come out reversed).
 $("#flipBtn").addEventListener("click", async () => {
-  if (!state.photoFile) return;
+  if (!state.picks.length) return;
   state.mirror = !state.mirror;
-  state.photos = await Promise.all((state.photoFiles || [state.photoFile]).map(f => shrinkImage(f, 1600, state.mirror)));
-  state.photo = state.photos[0];
-  $("#photoPreview").src = URL.createObjectURL(state.photo);
-  updatePreview();
+  for (const p of state.picks) { p.blob = await shrinkImage(p.src, 1600, state.mirror); URL.revokeObjectURL(p.url); p.url = URL.createObjectURL(p.blob); }
+  syncPicks();
 });
 
 /* voice recording */
@@ -710,11 +800,12 @@ function resetComposer() {
   composer.reset();
   Object.assign(state, { stickers: [], photo: null, video: null, voice: null, voiceMime: "", duration: 0, prompt: null });
   $$("#stickerPicker button").forEach(b => b.classList.remove("on"));
-  $("#photoPreview").hidden = true; $("#dropText").hidden = false; $("#photoInput").value = "";
+  $("#photoInput").value = "";
   $("#videoPreview").hidden = true; $("#videoPreview").removeAttribute("src"); $("#vshapeBlock").hidden = true;
   if (state.vthumbUrl) URL.revokeObjectURL(state.vthumbUrl);
   Object.assign(state, { vthumb: null, vthumbUrl: "", vshape: "tall" });
-  state.photoFile = null; state.photoFiles = null; state.photos = null; state.mirror = false; $("#flipBtn").hidden = true; $("#photoCount").hidden = true;
+  state.picks.forEach(p => URL.revokeObjectURL(p.url));
+  Object.assign(state, { picks: [], photos: null, mirror: false }); $("#photoTray").hidden = true; $("#trayHint").hidden = true; $("#flipBtn").hidden = true;
   recPreview.hidden = true; recTime.textContent = "tap to record";
 }
 
