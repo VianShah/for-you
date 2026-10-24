@@ -156,7 +156,7 @@ function renderExtras() {
     row("💐", "Send flowers", `Build ${esc(other())} a bouquet, stem by stem. A rose is ${SHOP.FLOWERS.rose.price}, a lily ${SHOP.FLOWERS.lily.price}, and it pops up for them the next time they open the diary.`,
       `<button class="ghost" data-flowers>build a bouquet</button>`) +
       (NAME && flowersFor(allPages, NAME).length ? `<div class="vase"><div class="label">flowers you've been sent</div><div class="vase-row">${flowersFor(allPages, NAME).slice(0, 6).map(f =>
-        `<button type="button" class="vase-item" data-see-flowers="${esc(f.id)}">${bouquetSvg(f.flowers, f.wrap)}<small>from ${esc(f.by)} · ${shortDay(f.at)}</small></button>`).join("")}</div></div>` : ""),
+        `<button type="button" class="vase-item" data-see-flowers="${esc(f.id)}">${bouquetSvg(f.flowers, f.wrap, f.layout)}<small>from ${esc(f.by)} · ${shortDay(f.at)}</small></button>`).join("")}</div></div>` : ""),
     row("🎉", `A surprise popup · ${SHOP.SURPRISE} 🪙`, `Hearts burst and your note pops up, with Goldiee, the next time ${esc(other())} opens the diary.`,
       `<button class="ghost" data-surprise>write the surprise</button>`),
     row("📣", `A super ping · ${SHOP.SUPERPING} 🪙`, `A loud, can't-miss notification on ${esc(other())}'s phone, in your own words.`,
@@ -171,44 +171,56 @@ function renderExtras() {
 }
 
 /* ---------- flowers ---------- */
+// Pick a flower, then tap where it goes in the bouquet; tap a placed flower to take it out.
 function openBouquetBuilder() {
   if (!KEY || !NAME) return toast("Set this phone up in the diary first 🔑");
-  const pick = {}, state = { wrap: "kraft" };
+  const st = { layout: [], pick: "rose", wrap: "kraft" };
   const back = document.createElement("div");
   back.className = "sheet-back";
   back.innerHTML = `<div class="sheet small bouquet-sheet"><div class="sheet-head"><h2>A bouquet for ${esc(other())}</h2><button type="button" class="icon-btn close" data-close>✕</button></div>
     <div class="bq-preview"></div>
-    <div class="bq-list">${Object.entries(SHOP.FLOWERS).map(([id, f]) => `<div class="bq-row"><svg viewBox="-16 -16 32 32" class="bq-ico">${flowerHead(id)}</svg>
-      <span><b>${esc(f.name)}</b><small>${f.price} 🪙 each</small></span><button type="button" class="bq-btn" data-bq="${id}" data-d="-1">−</button><b class="bq-n" data-n="${id}">0</b><button type="button" class="bq-btn" data-bq="${id}" data-d="1">+</button></div>`).join("")}</div>
+    <p class="hint bq-how">pick a flower, then tap the bouquet where you want it · tap a flower again to take it out</p>
+    <div class="bq-tools"><button type="button" class="ghost" data-bq-undo>↺ undo</button><button type="button" class="ghost" data-bq-auto>✨ arrange for me</button><button type="button" class="ghost" data-bq-clear>clear</button></div>
+    <div class="bq-palette">${Object.entries(SHOP.FLOWERS).map(([id, f]) => `<button type="button" class="bq-pick${id === "rose" ? " on" : ""}" data-bq-pick="${id}"><svg viewBox="-16 -16 32 32">${flowerHead(id)}</svg><b>${esc(f.name)}</b><small>${f.price} 🪙</small><i class="bq-n" data-n="${id}"></i></button>`).join("")}</div>
     <div class="label">wrapping</div><div class="choices bq-wraps">${Object.entries(SHOP.WRAPS).map(([id, [c]]) => `<button type="button" class="choice${id === "kraft" ? " on" : ""}" data-wrap="${id}"><i style="background:${c}"></i>${id}</button>`).join("")}</div>
     <input class="field" maxlength="120" placeholder="a little card to go with it (optional)" data-bq-note>
     <div class="game-actions"><button class="save" data-bq-send disabled>send it 💐</button></div><p class="hint bq-total"></p></div>`;
   document.body.appendChild(back);
+  const counts = () => layoutCounts(st.layout);
   const draw = () => {
-    const n = flowerCount(pick), cost = flowerCost(pick), have = myPoints(allPages);
-    $(".bq-preview", back).innerHTML = n ? bouquetSvg(pick, state.wrap) : `<p class="hint">Tap ＋ to add flowers 🌷</p>`;
-    Object.keys(SHOP.FLOWERS).forEach(id => { $(`[data-n="${id}"]`, back).textContent = pick[id] || 0; });
+    const c = counts(), n = st.layout.length, cost = flowerCost(c), have = myPoints(allPages);
+    $(".bq-preview", back).innerHTML = bouquetSvg(c, st.wrap, st.layout);
+    Object.keys(SHOP.FLOWERS).forEach(id => { $(`[data-n="${id}"]`, back).textContent = c[id] ? `×${c[id]}` : ""; });
     $(".bq-total", back).textContent = n ? `${n} ${n === 1 ? "flower" : "flowers"} · ${cost} goldies${cost > have ? ` (you have ${have})` : ""}` : `up to ${SHOP.MAX_STEMS} flowers`;
     $("[data-bq-send]", back).disabled = !n || cost > have;
     $("[data-bq-send]", back).textContent = n ? `send it · ${cost} 🪙 💐` : "send it 💐";
   };
   back.addEventListener("click", async ev => {
     if (ev.target === back || ev.target.closest("[data-close]")) return back.remove();
-    const b = ev.target.closest("[data-bq]");
-    if (b) {
-      const id = b.dataset.bq, d = Number(b.dataset.d);
-      if (d > 0 && flowerCount(pick) >= SHOP.MAX_STEMS) return toast(`${SHOP.MAX_STEMS} flowers is a very full bouquet 💐`);
-      pick[id] = Math.max(0, (pick[id] || 0) + d); if (!pick[id]) delete pick[id];
+    const svg = ev.target.closest(".bq-preview svg");
+    if (svg) {
+      const placed = ev.target.closest("[data-i]");
+      if (placed) { st.layout.splice(Number(placed.dataset.i), 1); return draw(); }
+      if (st.layout.length >= SHOP.MAX_STEMS) return toast(`${SHOP.MAX_STEMS} flowers is a very full bouquet 💐`);
+      const pt = svg.createSVGPoint(); pt.x = ev.clientX; pt.y = ev.clientY;
+      const p = pt.matrixTransform(svg.getScreenCTM().inverse());
+      const clamp = (v, a, b) => Math.min(b, Math.max(a, v));
+      st.layout.push({ f: st.pick, x: Math.round(clamp(p.x, BQ_AREA.x1, BQ_AREA.x2)), y: Math.round(clamp(p.y, BQ_AREA.y1, BQ_AREA.y2)) });
       return draw();
     }
+    const pk = ev.target.closest("[data-bq-pick]");
+    if (pk) { st.pick = pk.dataset.bqPick; $$("[data-bq-pick]", back).forEach(x => x.classList.toggle("on", x === pk)); return; }
+    if (ev.target.closest("[data-bq-undo]")) { st.layout.pop(); return draw(); }
+    if (ev.target.closest("[data-bq-clear]")) { st.layout = []; return draw(); }
+    if (ev.target.closest("[data-bq-auto]")) { st.layout = autoLayout(counts()).map(p => ({ ...p, x: Math.round(p.x), y: Math.round(p.y) })); return draw(); }
     const w = ev.target.closest("[data-wrap]");
-    if (w) { state.wrap = w.dataset.wrap; $$("[data-wrap]", back).forEach(x => x.classList.toggle("on", x === w)); return draw(); }
+    if (w) { st.wrap = w.dataset.wrap; $$("[data-wrap]", back).forEach(x => x.classList.toggle("on", x === w)); return draw(); }
     const send = ev.target.closest("[data-bq-send]");
     if (send) {
-      const cost = flowerCost(pick), n = flowerCount(pick);
+      const c = counts(), cost = flowerCost(c), n = st.layout.length;
       if (!canBuy(cost) || !confirm(`Send ${other()} ${n} ${n === 1 ? "flower" : "flowers"} for ${cost} goldies?`)) return;
       send.disabled = true;
-      if (await buy("flowers", cost, { for: other(), flowers: { ...pick }, wrap: state.wrap, note: $("[data-bq-note]", back).value.trim().slice(0, 120) }, `${NAME} sent flowers`)) {
+      if (await buy("flowers", cost, { for: other(), flowers: c, layout: st.layout, wrap: st.wrap, note: $("[data-bq-note]", back).value.trim().slice(0, 120) }, `${NAME} sent flowers`)) {
         notifyPartner(`💐 ${NAME} sent you flowers`, "Open the diary to see them");
         back.remove();
         burst(innerWidth / 2, innerHeight / 2, 24);
@@ -222,7 +234,7 @@ function showFlowers(f) {
   if (!f) return;
   const back = document.createElement("div");
   back.className = "sheet-back";
-  back.innerHTML = `<div class="sheet small surprise-card">${bouquetSvg(f.flowers, f.wrap)}<small>flowers from ${esc(f.by)}</small>${f.note ? `<p>${esc(f.note)}</p>` : ""}<button class="save" data-close>💐</button></div>`;
+  back.innerHTML = `<div class="sheet small surprise-card">${bouquetSvg(f.flowers, f.wrap, f.layout)}<small>flowers from ${esc(f.by)}</small>${f.note ? `<p>${esc(f.note)}</p>` : ""}<button class="save" data-close>💐</button></div>`;
   back.addEventListener("click", ev => { if (ev.target === back || ev.target.closest("[data-close]")) back.remove(); });
   document.body.appendChild(back);
 }

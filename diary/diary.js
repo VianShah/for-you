@@ -183,12 +183,34 @@ function showSurprise() {
   const back = document.createElement("div");
   back.className = "sheet-back surprise-pop";
   back.innerHTML = s.item === "flowers"
-    ? `<div class="sheet small surprise-card">${bouquetSvg(s.flowers, s.wrap)}<small>flowers from ${esc(s.by)}</small>${s.note ? `<p>${esc(s.note)}</p>` : ""}<button class="save" data-close>thank you 💐</button></div>`
+    ? `<div class="sheet small surprise-card">${bouquetSvg(s.flowers, s.wrap, s.layout)}<small>flowers from ${esc(s.by)}</small>${s.note ? `<p>${esc(s.note)}</p>` : ""}<button class="save" data-close>thank you 💐</button></div>`
     : `<div class="sheet small surprise-card"><div class="surprise-look">${window.goldiee?.look ? goldiee.look(currentOutfit(entries)) : "🐶"}</div>
     <small>a surprise from ${esc(s.by)}</small><p>${esc(s.note || "Just thinking of you ♥")}</p><button class="save" data-close>aww ♥</button></div>`;
   back.addEventListener("click", ev => { if (ev.target === back || ev.target.closest("[data-close]")) back.remove(); });
   document.body.appendChild(back);
   for (let i = 0; i < 4; i++) setTimeout(() => burst(innerWidth * (.2 + Math.random() * .6), innerHeight * (.25 + Math.random() * .4), 18), i * 350);
+}
+
+// Coming in from a notification: open the newest thing from the other one (a new page,
+// or a page with a new reply) with the reply box ready. Each thing only opens itself once.
+let cameBackAt = Date.now();
+document.addEventListener("visibilitychange", () => { if (!document.hidden) cameBackAt = Date.now(); });
+function openNewest() {
+  if (!NAME || $$(".sheet-back, .lightbox").some(el => !el.hidden && el.isConnected)) return false;
+  const mark = Number(store.get("auto-opened-" + NAME)) || 0;
+  store.set("auto-opened-" + NAME, String(Date.now()));
+  if (!mark) return false; // first time on this phone: nothing to jump to yet
+  const theirs = (at, by) => at && Date.parse(at) > mark && by && by !== NAME;
+  let best = null;
+  for (const e of entries.filter(onWall)) {
+    if (!e.together && theirs(e.at, e.by || e.author) && (!best || Date.parse(e.at) > best.at)) best = { id: e.id, at: Date.parse(e.at) };
+    for (const r of e.replies || []) if (theirs(r.at, r.by) && (!best || Date.parse(r.at) > best.at)) best = { id: e.id, at: Date.parse(r.at) };
+  }
+  const e = best && entries.find(x => x.id === best.id);
+  if (!e || isLocked(e)) return false;
+  openPost(e.id);
+  setTimeout(() => { const sh = $(".post-sheet"); if (sh) sh.scrollTop = sh.scrollHeight; $("#replyText")?.focus({ preventScroll: true }); }, 350);
+  return true;
 }
 
 let autoRefreshOn = false;
@@ -198,13 +220,14 @@ async function refresh() {
     lastSeen = Number(store.get("diary-seen-" + NAME)) || 0;
     render();
     emptyOldBin();
-    setTimeout(goldieeNudge, 1500);
+    if (!openNewest()) setTimeout(goldieeNudge, 1500);
     if (!autoRefreshOn) {
       autoRefreshOn = true;
       startAutoRefresh(list => {
         entries = list;
         render();
         if (openId && !$("#postBack").hidden) renderPost();
+        else if (Date.now() - cameBackAt < 15000) openNewest(); // just came back (e.g. after a notification)
       }, entries);
     }
     // Remember this visit a moment later, so the ribbons show this time but not next time.

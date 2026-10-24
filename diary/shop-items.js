@@ -137,6 +137,7 @@ SHOP.FLOWERS = {
 };
 SHOP.WRAPS = { kraft: ["#d9b38c", "#c49a6c"], blush: ["#f7cfd6", "#eeb3be"], ivory: ["#fbf3e6", "#eadcc5"], midnight: ["#3a2a4a", "#2a1d38"] };
 SHOP.MAX_STEMS = 24;
+const layoutCounts = layout => (layout || []).reduce((c, p) => (c[p.f] = (c[p.f] || 0) + 1, c), {});
 const flowerCount = f => Object.values(f || {}).reduce((s, n) => s + n, 0);
 const flowerCost = f => Object.entries(f || {}).reduce((s, [id, n]) => s + (SHOP.FLOWERS[id]?.price || 0) * n, 0);
 
@@ -156,20 +157,24 @@ function flowerHead(id) {
   }
   return "";
 }
-// The whole bouquet: heads in a natural cluster, stems, and a paper cone with a ribbon.
-function bouquetSvg(flowers, wrap = "kraft") {
-  const heads = Object.entries(flowers || {}).flatMap(([id, n]) => Array(n).fill(id));
-  // Mix them up the same way every time, so the same bouquet always looks the same.
-  heads.splice(0, heads.length, ...heads.map((id, i) => ({ id, k: hash(id + i) })).sort((a, b) => a.k - b.k).map(x => x.id));
+// Where flowers can go in the bouquet (in the 200×240 picture): above the paper cone.
+const BQ_AREA = { x1: 28, x2: 172, y1: 22, y2: 140 };
+// Flowers arranged for you: a natural cluster, the same every time for the same bouquet.
+function autoLayout(flowers) {
+  const heads = Object.entries(flowers || {}).flatMap(([id, n]) => Array(n).fill(id))
+    .map((id, i) => ({ id, k: hash(id + i) })).sort((a, b) => a.k - b.k).map(x => x.id);
   const n = heads.length, R = 18 + Math.sqrt(n) * 13;
-  const pos = heads.map((id, i) => {
-    const r = n === 1 ? 0 : R * Math.sqrt((i + .5) / n), a = i * 2.39996;
-    return { id, x: 100 + r * Math.cos(a), y: 92 + r * Math.sin(a) * .7, s: n > 12 ? .85 : 1 };
-  });
+  return heads.map((f, i) => { const r = n === 1 ? 0 : R * Math.sqrt((i + .5) / n), a = i * 2.39996; return { f, x: 100 + r * Math.cos(a), y: 92 + r * Math.sin(a) * .7 }; });
+}
+// The whole bouquet: heads where the sender placed them (or arranged for you), stems, and a paper cone with a ribbon.
+function bouquetSvg(flowers, wrap = "kraft", layout = null) {
+  const spots = layout?.length ? layout : autoLayout(flowers);
+  const n = spots.length;
+  const pos = spots.map((p, i) => ({ i, id: p.f, x: p.x, y: p.y, s: n > 12 ? .85 : 1 }));
   const [w1, w2] = SHOP.WRAPS[wrap] || SHOP.WRAPS.kraft;
   const stems = pos.map(p => `<path d="M${p.x.toFixed(1)} ${p.y.toFixed(1)} Q${((p.x + 100) / 2).toFixed(1)} ${(p.y + 60).toFixed(1)} 100 196" stroke="#5a9a4a" stroke-width="2" fill="none"/>`).join("");
   const leaves = n ? `<path d="M100 150q-34-6-40-34q26 6 40 34zM100 150q34-6 40-34q-26 6-40 34z" fill="#6aa84f"/>` : "";
-  const flowersSvg = pos.sort((a, b) => a.y - b.y).map(p => `<g transform="translate(${p.x.toFixed(1)} ${p.y.toFixed(1)}) scale(${p.s})">${flowerHead(p.id)}</g>`).join("");
+  const flowersSvg = pos.sort((a, b) => a.y - b.y).map(p => `<g data-i="${p.i}" transform="translate(${p.x.toFixed(1)} ${p.y.toFixed(1)}) scale(${p.s})">${flowerHead(p.id)}</g>`).join("");
   return `<svg class="bouquet" viewBox="0 0 200 240" aria-hidden="true">${stems}${leaves}
     <path d="M46 128 L100 234 L154 128 Q100 146 46 128z" fill="${w1}"/><path d="M46 128 L100 234 L84 136z" fill="${w2}" opacity=".7"/>
     ${flowersSvg}

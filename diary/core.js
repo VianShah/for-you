@@ -383,7 +383,7 @@ function openGoldieRules(list) {
       <li><b>🧩</b> a puzzle race bet: the winner takes it from the other</li>
       <li><b class="minus">−${R.PIN_COST}</b> pin one of your pictures to the love page for ${R.PIN_DAYS} days 🏠</li>
     </ul>
-    <p class="help">Below 0, Goldiee starts crying 😢, and every 15 minutes (outside sleep time) the other one gets a ping about it. Each call is +${R.CALL} for every ${R.CALL_BLOCK_MIN} minutes together. The middle number counts the days in a row you <em>both</em> posted.</p>
+    <p class="help">Below 0, Goldiee starts crying 😢, and every 15 minutes (outside sleep time) the other one gets a ping about it. Each call is +${R.CALL} for every ${R.CALL_BLOCK_MIN} minutes together, and whoever starts it from the diary gets +${R.CALLER} more. The middle number counts the days in a row you <em>both</em> posted.</p>
     ${me ? `<div class="label">your last goldies</div><ul class="history">${hist || "<li>nothing yet, so go write something ♥</li>"}</ul>` : ""}</div>`;
   back.addEventListener("click", e => { if (e.target === back || e.target.closest("[data-close]")) back.remove(); });
   document.body.appendChild(back);

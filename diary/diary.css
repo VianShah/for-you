@@ -745,3 +745,16 @@ body[data-day-theme="photo"]::before { background: linear-gradient(rgba(251,245,
 .gallery figure span { position: absolute; right: 8px; bottom: 8px; background: rgba(20,10,14,.55); color: #fff; font-size: 12px; padding: 3px 9px; border-radius: 999px; }
 .bouquet-sheet .bq-preview { position: sticky; top: -22px; z-index: 2; background: radial-gradient(circle at 50% 40%, #fff6e6, var(--paper) 70%); }
 .bouquet-sheet .bq-preview .bouquet { max-width: 170px; }
+/* placing flowers by tapping */
+.bouquet-sheet .bq-preview .bouquet { max-width: 220px; cursor: crosshair; touch-action: manipulation; }
+.bq-how { margin: 0 0 8px; }
+.bq-tools { display: flex; gap: 6px; justify-content: center; flex-wrap: wrap; margin-bottom: 12px; }
+.bq-tools .ghost { padding: 8px 12px; font-size: 13px; }
+.bq-palette { display: grid; grid-template-columns: repeat(4, 1fr); gap: 6px; margin-bottom: 12px; }
+.bq-pick { position: relative; display: grid; justify-items: center; gap: 1px; padding: 8px 4px; border-radius: 12px; background: #fff; border: 1px solid var(--line); color: var(--ink); }
+.bq-pick.on { border-color: var(--wine); box-shadow: 0 0 0 2px var(--wine) inset; background: #fff6e6; }
+.bq-pick svg { width: 30px; height: 30px; }
+.bq-pick b { font-weight: 400; font-size: 12px; }
+.bq-pick small { font-size: 11px; color: var(--muted); }
+.bq-pick .bq-n { position: absolute; top: 3px; right: 5px; font-style: normal; font-size: 11px; color: var(--wine); }
+:root[data-theme="dark"] .bq-pick { background: #fffaf3; color: #3a2026; }

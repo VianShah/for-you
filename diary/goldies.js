@@ -24,6 +24,9 @@
     KW_ANSWER: 5, KW_SPOT: 20, KW_CLOSE: 10, // "who knows whom": answering about yourself / a spot-on / a close guess
     PIN_COST: 100, PIN_DAYS: 3,         // a pinned picture stays on the love page for 3 days
     RACE_BETS: [0, 50, 150],            // what a puzzle race can be played for (winner takes it from the loser)
+    // Goldies added by hand (not earned in the diary): { name: [{ at, pts, why }] }.
+    BONUS: { Vian: [{ at: "2026-10-24T15:47:00Z", pts: 2000, why: "a bonus of 2000 goldies 🎉" }] },
+    CALLER: 70, CALLER_FROM: "2026-10-24T15:47:00Z", // whoever starts a call from the diary gets 70 extra (calls from here on)
     WELCOME: 50,                       // a starting gift, so one quiet morning doesn't make Goldiee cry
     CRY_BELOW: 0,                       // Goldiee cries when a score drops below this
   };
@@ -81,6 +84,7 @@
   // Every moment that earned someone points, oldest first.
   function events(entries, name, now = Date.now()) {
     const out = [{ at: START, pts: RULES.WELCOME, why: "a welcome gift from Goldiee", gift: true }];
+    for (const b of RULES.BONUS[name] || []) out.push({ at: Date.parse(b.at), pts: b.pts, why: b.why, gift: true, noClock: true });
     for (const e of entries || []) {
       const at = Date.parse(e.at);
       // A call counts for both of you; any call (even a short one) resets the 2.5-hour clock.
@@ -88,6 +92,8 @@
         if (at >= START && (e.by === name || e.with === name)) {
           const mins = Math.round((e.duration || 0) / 60);
           out.push({ at: at + (e.duration || 0) * 1000, pts: Math.floor(mins / RULES.CALL_BLOCK_MIN) * RULES.CALL, why: `a ${mins} min ${e.kind === "audio" ? "call" : "FaceTime"}`, callStart: at });
+          if (e.by === name && at >= Date.parse(RULES.CALLER_FROM))
+            out.push({ at: at + (e.duration || 0) * 1000, pts: RULES.CALLER, why: "for starting the call 📞", callStart: at });
         }
         continue;
       }
