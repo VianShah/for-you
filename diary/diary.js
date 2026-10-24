@@ -104,7 +104,9 @@ function cardHtml(e, full = false) {
     const frame = ["polaroid", "tape", "film", "heart", "stamp"].includes(e.frame) ? e.frame : "polaroid";
     const fcls = frame === "tape" ? "tape-frame" : frame;
     return `<article class="card photo ${fcls}${cls}" ${common}>${frame === "tape" ? tapeHtml(e, 2) : ""}${top}
-      <div class="body"><div class="wrap"><img ${e.previewSrc ? `src="${e.previewSrc}"` : imgSrcAttrs(e.media)} alt="${esc(e.caption || "a picture of us")}" loading="lazy"></div>
+      <div class="body"><div class="wrap">${full && e.more?.length && !e.previewSrc
+        ? `<div class="gallery">${[e.media, ...e.more].map((m, i, all) => `<figure><img ${imgSrcAttrs(m)} data-path="${esc(m)}" alt="${esc(e.caption || "a picture of us")} (${i + 1} of ${all.length})"><span>${i + 1} / ${all.length}</span></figure>`).join("")}</div>`
+        : `<img ${e.previewSrc ? `src="${e.previewSrc}"` : imgSrcAttrs(e.media)} alt="${esc(e.caption || "a picture of us")}" loading="lazy">${e.more?.length ? `<span class="photo-count-badge">📷 ${e.more.length + 1}</span>` : ""}`}</div>
       ${e.caption ? `<div class="cap">${esc(e.caption)}</div>` : ""}${guessHtml(e)}</div>${lock}${binNote}${signHtml(e)}</article>`;
   }
   if (e.type === "video") {
@@ -174,12 +176,15 @@ function render() {
 function showSurprise() {
   if (!NAME || $(".surprise-pop")) return;
   const seen = store.get("surprises-seen").split(",");
-  const s = surprisesFor(entries, NAME).find(e => !seen.includes(e.id));
+  // Surprises and flowers both pop up once, the first time this phone opens the diary after.
+  const s = [...surprisesFor(entries, NAME), ...flowersFor(entries, NAME)].sort((a, b) => Date.parse(a.at) - Date.parse(b.at)).find(e => !seen.includes(e.id));
   if (!s) return;
   store.set("surprises-seen", [s.id, ...seen.filter(Boolean)].slice(0, 100).join(","));
   const back = document.createElement("div");
   back.className = "sheet-back surprise-pop";
-  back.innerHTML = `<div class="sheet small surprise-card"><div class="surprise-look">${window.goldiee?.look ? goldiee.look(currentOutfit(entries)) : "🐶"}</div>
+  back.innerHTML = s.item === "flowers"
+    ? `<div class="sheet small surprise-card">${bouquetSvg(s.flowers, s.wrap)}<small>flowers from ${esc(s.by)}</small>${s.note ? `<p>${esc(s.note)}</p>` : ""}<button class="save" data-close>thank you 💐</button></div>`
+    : `<div class="sheet small surprise-card"><div class="surprise-look">${window.goldiee?.look ? goldiee.look(currentOutfit(entries)) : "🐶"}</div>
     <small>a surprise from ${esc(s.by)}</small><p>${esc(s.note || "Just thinking of you ♥")}</p><button class="save" data-close>aww ♥</button></div>`;
   back.addEventListener("click", ev => { if (ev.target === back || ev.target.closest("[data-close]")) back.remove(); });
   document.body.appendChild(back);
@@ -221,6 +226,9 @@ function goldieeNudge() {
   const kw = entries.find(e => e.type === "kwho" && !e.dropped && !e.verdict &&
     (e.about === NAME ? !e.answer || e.guess : !e.guess));
   if (kw) return g.say("your turn in who knows whom 🎯", "games.html#kwho", "play →");
+  // A dare waiting on you, with its clock running.
+  const dare = buys(entries, "coupon").find(e => e.for === NAME && !e.done && Goldies.dareDue(e) && Date.now() < Goldies.dareDue(e));
+  if (dare) return g.say(`${dare.by} dared you 😈 ${Math.max(1, Math.floor((Goldies.dareDue(dare) - Date.now()) / 36e5))}h left, or lose ${2 * dare.cost} goldies`, "shop.html#coupons", "show me →");
   const race = entries.find(e => e.type === "race" && !e.cancelled && (e.accepted ? (e.by === NAME || e.with === NAME) && !e.times?.[NAME] : e.with === NAME));
   if (race) return g.say(race.accepted ? "your puzzle race is waiting 🧩" : `${race.by} challenged you to a puzzle race 🧩`, "games.html#race", "play →");
   const replied = entries.find(e => onWall(e) && unreadReplies(e));
@@ -559,9 +567,12 @@ function setVideoShape(shape) {
   state.vshape = shape;
   $$("#vshapeBlock .choice").forEach(c => c.classList.toggle("on", c.dataset.v === shape));
 }
+const MAX_PHOTOS = 10; // pictures on one page
 $("#photoInput").addEventListener("change", async e => {
-  const file = e.target.files[0]; if (!file) return;
-  // A video goes up as it is (no shrinking); it becomes a "video" page.
+  const files = [...e.target.files]; if (!files.length) return;
+  const file = files.find(isVideoFile) && files.length === 1 ? files[0] : files.find(f => !isVideoFile(f)) || files[0];
+  $("#photoCount").hidden = true;
+  // A video goes up as it is (no shrinking); it becomes a "video" page, on its own.
   if (isVideoFile(file)) {
     if (videoTooBig(file)) { e.target.value = ""; return; }
     state.video = file; state.photo = null; state.photoFile = null;
@@ -574,14 +585,22 @@ $("#photoInput").addEventListener("change", async e => {
     return updatePreview();
   }
   state.video = null; state.vthumb = null; $("#videoPreview").hidden = true; $("#vshapeBlock").hidden = true;
+  // One picture or several: they all go on the same page (videos need a page of their own).
+  const pics = files.filter(f => !isVideoFile(f));
+  if (pics.length < files.length) toast("Videos go on a page of their own, so just the pictures this time.");
+  if (pics.length > MAX_PHOTOS) toast(`Up to ${MAX_PHOTOS} pictures on one page, so the first ${MAX_PHOTOS}.`);
   try {
-    state.photoFile = file; state.mirror = false;
-    state.photo = await shrinkImage(file);
+    state.photoFiles = pics.slice(0, MAX_PHOTOS); state.photoFile = state.photoFiles[0]; state.mirror = false;
+    state.photos = await Promise.all(state.photoFiles.map(f => shrinkImage(f)));
+    state.photo = state.photos[0];
     $("#flipBtn").hidden = false;
+    $("#flipBtn").textContent = state.photos.length > 1 ? "↔ flip the pictures" : "↔ flip picture";
     updatePreview();
     const prev = $("#photoPreview");
     prev.src = URL.createObjectURL(state.photo); prev.hidden = false;
     $("#dropText").hidden = true;
+    $("#photoCount").hidden = state.photos.length < 2;
+    $("#photoCount").textContent = `📷 ${state.photos.length} pictures`;
   } catch { toast("Couldn't open that picture. Try a JPG or PNG."); }
 });
 
@@ -589,7 +608,8 @@ $("#photoInput").addEventListener("change", async e => {
 $("#flipBtn").addEventListener("click", async () => {
   if (!state.photoFile) return;
   state.mirror = !state.mirror;
-  state.photo = await shrinkImage(state.photoFile, 1600, state.mirror);
+  state.photos = await Promise.all((state.photoFiles || [state.photoFile]).map(f => shrinkImage(f, 1600, state.mirror)));
+  state.photo = state.photos[0];
   $("#photoPreview").src = URL.createObjectURL(state.photo);
   updatePreview();
 });
@@ -656,7 +676,7 @@ function updatePreview() {
       previewThumb: state.vthumbUrl || "data:image/svg+xml," + encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 4 3"><rect width="4" height="3" fill="#3a2026"/></svg>') });
   } else if (state.type === "photo") {
     if (state.photo) { if (previewPhotoUrl) URL.revokeObjectURL(previewPhotoUrl); previewPhotoUrl = URL.createObjectURL(state.photo); }
-    Object.assign(draft, { frame: state.frame, caption: f.caption.value.trim(), media: "preview.jpg",
+    Object.assign(draft, { frame: state.frame, caption: f.caption.value.trim(), media: "preview.jpg", more: (state.photos || []).slice(1).map(() => "preview.jpg"),
       previewSrc: state.photo ? previewPhotoUrl : "data:image/svg+xml," + encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 4 3"><rect width="4" height="3" fill="#f3d9d4"/></svg>') });
   }
   if (state.type === "voice") Object.assign(draft, { title: f.voiceTitle.value.trim(), duration: Math.round(state.duration) });
@@ -672,7 +692,7 @@ function resetComposer() {
   $("#videoPreview").hidden = true; $("#videoPreview").removeAttribute("src"); $("#vshapeBlock").hidden = true;
   if (state.vthumbUrl) URL.revokeObjectURL(state.vthumbUrl);
   Object.assign(state, { vthumb: null, vthumbUrl: "", vshape: "tall" });
-  state.photoFile = null; state.mirror = false; $("#flipBtn").hidden = true;
+  state.photoFile = null; state.photoFiles = null; state.photos = null; state.mirror = false; $("#flipBtn").hidden = true; $("#photoCount").hidden = true;
   recPreview.hidden = true; recTime.textContent = "tap to record";
 }
 
@@ -720,6 +740,16 @@ composer.addEventListener("submit", async e => {
       entry.media = packed.path;
       const res = await putFile(entry.media, packed.b64, `${isVid ? "Video" : state.type === "photo" ? "Picture" : "Voice note"} from ${NAME}`);
       entry.mediaSha = res.content.sha;
+      // More than one picture: the rest go up next to the first, and the page shows them all.
+      if (!isVid && state.type === "photo" && state.photos?.length > 1) {
+        entry.more = [];
+        for (const [i, blob] of state.photos.slice(1).entries()) {
+          setStatus(st, `Uploading picture ${i + 2} of ${state.photos.length}…`);
+          const m = await packMedia(`${MEDIA_DIR}${id}-${i + 2}.jpg`, blob);
+          await putFile(m.path, m.b64, `Picture from ${NAME}`);
+          entry.more.push(m.path);
+        }
+      }
       if (isVid && state.vthumb) { // the thumbnail the wall shows
         const t = await packMedia(`${MEDIA_DIR}${id}-thumb.jpg`, state.vthumb);
         await putFile(t.path, t.b64, `Video thumbnail from ${NAME}`);

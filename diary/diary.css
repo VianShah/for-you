@@ -708,3 +708,40 @@ body[data-day-theme="photo"]::before { background: linear-gradient(rgba(251,245,
 .surprise-card .goldiee-look { width: 120px; height: 120px; margin-bottom: 18px; }
 .surprise-card small { font-size: 11px; letter-spacing: .2em; text-transform: uppercase; color: var(--rose); }
 .surprise-card p { font-family: var(--hand); font-size: 30px; line-height: 1.15; color: var(--ink); }
+
+/* dares that ran out of time */
+.coupon-card.missed { opacity: .7; border-color: #b7a6a9; filter: grayscale(.4); }
+
+/* flowers 💐 */
+.bouquet { width: 100%; max-width: 240px; height: auto; display: block; margin: 0 auto; overflow: visible; }
+.bouquet-sheet .bq-preview { min-height: 160px; display: grid; place-items: center; margin-bottom: 10px; background: radial-gradient(circle at 50% 40%, #fff6e6, transparent 70%); border-radius: 16px; }
+.bq-list { display: grid; gap: 6px; margin-bottom: 12px; }
+.bq-row { display: grid; grid-template-columns: 36px 1fr 34px 28px 34px; align-items: center; gap: 8px; padding: 6px 8px; border-radius: 12px; background: #fff; border: 1px solid var(--line); }
+.bq-row span { display: grid; line-height: 1.2; }
+.bq-row b { font-weight: 400; }
+.bq-row small { font-size: 12px; color: var(--muted); }
+.bq-ico { width: 32px; height: 32px; }
+.bq-btn { width: 34px; height: 34px; border-radius: 50%; border: 1px solid var(--line); background: var(--paper); font-size: 18px; color: var(--wine); }
+.bq-n { text-align: center; font-variant-numeric: tabular-nums; }
+.bq-wraps .choice { display: inline-flex; align-items: center; gap: 6px; text-transform: capitalize; }
+.bq-wraps .choice i { width: 14px; height: 14px; border-radius: 50%; border: 1px solid var(--line); display: inline-block; }
+.bq-total { margin-top: 6px; }
+.vase { margin-top: -4px; }
+.vase-row { display: flex; gap: 10px; overflow-x: auto; padding: 4px 2px 8px; }
+.vase-item { flex: none; width: 110px; padding: 6px; border-radius: 14px; background: var(--paper); border: 1px solid var(--line); display: grid; gap: 4px; }
+.vase-item small { font-size: 11px; color: var(--muted); }
+.surprise-card .bouquet { max-width: 220px; }
+:root[data-theme="dark"] .bq-row, :root[data-theme="dark"] .vase-item { background: #fffaf3; color: #3a2026; }
+
+/* several pictures on one page */
+.photo-count { margin-top: 6px; font-size: 13px; color: var(--wine); }
+.drop { position: relative; }
+.drop .photo-count { position: absolute; right: 8px; bottom: 8px; background: rgba(255,255,255,.9); padding: 4px 10px; border-radius: 999px; font-family: var(--sans); }
+.photo .wrap { position: relative; }
+.photo-count-badge { position: absolute; right: 8px; top: 8px; background: rgba(20,10,14,.55); color: #fff; font-size: 12px; padding: 3px 9px; border-radius: 999px; backdrop-filter: blur(4px); -webkit-backdrop-filter: blur(4px); }
+.gallery { display: flex; overflow-x: auto; scroll-snap-type: x mandatory; gap: 0; -webkit-overflow-scrolling: touch; }
+.gallery figure { flex: 0 0 100%; scroll-snap-align: center; position: relative; }
+.gallery figure img { width: 100%; height: auto; display: block; }
+.gallery figure span { position: absolute; right: 8px; bottom: 8px; background: rgba(20,10,14,.55); color: #fff; font-size: 12px; padding: 3px 9px; border-radius: 999px; }
+.bouquet-sheet .bq-preview { position: sticky; top: -22px; z-index: 2; background: radial-gradient(circle at 50% 40%, #fff6e6, var(--paper) 70%); }
+.bouquet-sheet .bq-preview .bouquet { max-width: 170px; }

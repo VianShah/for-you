@@ -61,17 +61,25 @@ function renderWardrobe() {
 
 /* ---------- dares ---------- */
 function renderCoupons() {
-  $("#couponIntro").textContent = `Buy a dare for ${other()}. They do it from wherever they are, and when you tap "got it", they earn ${SHOP.COUPON_REWARD} goldies for being brave.`;
+  $("#couponIntro").textContent = `Buy a dare for ${other()}. They have ${SHOP.DARE_HOURS} hours to do it from wherever they are. Done in time and you tap "got it": they earn ${SHOP.COUPON_REWARD} goldies for being brave. Not done in time: they lose twice the dare's price.`;
+  const now = Date.now(), DAY = 864e5;
+  const missed = e => { const due = Goldies.dareDue(e); return !!due && now >= due && !(e.done && Date.parse(e.done.at) <= due); };
+  // Missed dares stay on the list for a day so you both see what happened, then go.
+  const showing = e => !e.thanked && !(missed(e) && now - Goldies.dareDue(e) > DAY);
   const all = buys(allPages, "coupon").sort((a, b) => Date.parse(b.at) - Date.parse(a.at));
-  const forMe = all.filter(e => e.for === NAME && !e.thanked);
-  const fromMe = all.filter(e => e.by === NAME && !e.thanked);
+  const forMe = all.filter(e => e.for === NAME && showing(e));
+  const fromMe = all.filter(e => e.by === NAME && showing(e));
+  const left = e => { const ms = Goldies.dareDue(e) - now, h = Math.floor(ms / 36e5); return h >= 1 ? `${h}h left` : `${Math.max(1, Math.ceil(ms / 6e4))} min left`; };
   const card = (e, mine) => {
     const c = SHOP.coupons[e.coupon] || { emoji: "😈", name: "a dare" };
-    const status = e.done ? `done ${shortDay(e.done.at)}` : `dared ${shortDay(e.at)}`;
-    const act = mine
-      ? (e.done ? `<button class="save" data-coupon-thanks="${esc(e.id)}">got it ❤️ (+${e.reward || SHOP.COUPON_REWARD} for ${esc(e.for)})</button>` : `<p class="hint">Waiting for ${esc(e.for)} to do it.</p>`)
-      : (e.done ? `<p class="hint">Done ✓ Waiting for ${esc(e.by)} to say "got it".</p>` : `<button class="save" data-coupon-done="${esc(e.id)}">dare done ✓</button>`);
-    return `<div class="coupon-card${mine ? "" : " for-me"}"><div class="coupon-emoji">${c.emoji}</div><div><small>${mine ? `you dared ${esc(e.for)}` : `${esc(e.by)} dares you`} · ${status}</small>
+    const lost = 2 * (e.cost || 0);
+    const status = missed(e) ? "⌛ missed" : e.done ? `done ${shortDay(e.done.at)}` : Goldies.dareDue(e) ? `⏳ ${left(e)}` : `dared ${shortDay(e.at)}`;
+    const act = missed(e)
+      ? `<p class="hint">Not done in ${SHOP.DARE_HOURS} hours: ${mine ? `${esc(e.for)} lost` : "you lost"} ${lost} goldies.</p>`
+      : mine
+        ? (e.done ? `<button class="save" data-coupon-thanks="${esc(e.id)}">got it ❤️ (+${e.reward || SHOP.COUPON_REWARD} for ${esc(e.for)})</button>` : `<p class="hint">Waiting for ${esc(e.for)} to do it.</p>`)
+        : (e.done ? `<p class="hint">Done ✓ Waiting for ${esc(e.by)} to say "got it".</p>` : `<button class="save" data-coupon-done="${esc(e.id)}">dare done ✓</button>${Goldies.dareDue(e) ? `<p class="hint">or lose ${lost} goldies</p>` : ""}`);
+    return `<div class="coupon-card${mine ? "" : " for-me"}${missed(e) ? " missed" : ""}"><div class="coupon-emoji">${c.emoji}</div><div><small>${mine ? `you dared ${esc(e.for)}` : `${esc(e.by)} dares you`} · ${status}</small>
       <b>${esc(c.name)}</b>${e.note ? `<p class="coupon-note">“${esc(e.note)}”</p>` : ""}<div class="game-actions">${act}</div></div></div>`;
   };
   $("#couponTodo").innerHTML =
@@ -145,6 +153,10 @@ function renderExtras() {
   $("#extrasList").innerHTML = [
     row("🎁", "Gift some goldies", `Send ${esc(other())} goldies from yours, to cheer them up or just because.`,
       SHOP.GIFTS.map(n => `<button class="ghost" data-gift="${n}">gift ${n} 🪙</button>`).join("")),
+    row("💐", "Send flowers", `Build ${esc(other())} a bouquet, stem by stem. A rose is ${SHOP.FLOWERS.rose.price}, a lily ${SHOP.FLOWERS.lily.price}, and it pops up for them the next time they open the diary.`,
+      `<button class="ghost" data-flowers>build a bouquet</button>`) +
+      (NAME && flowersFor(allPages, NAME).length ? `<div class="vase"><div class="label">flowers you've been sent</div><div class="vase-row">${flowersFor(allPages, NAME).slice(0, 6).map(f =>
+        `<button type="button" class="vase-item" data-see-flowers="${esc(f.id)}">${bouquetSvg(f.flowers, f.wrap)}<small>from ${esc(f.by)} · ${shortDay(f.at)}</small></button>`).join("")}</div></div>` : ""),
     row("🎉", `A surprise popup · ${SHOP.SURPRISE} 🪙`, `Hearts burst and your note pops up, with Goldiee, the next time ${esc(other())} opens the diary.`,
       `<button class="ghost" data-surprise>write the surprise</button>`),
     row("📣", `A super ping · ${SHOP.SUPERPING} 🪙`, `A loud, can't-miss notification on ${esc(other())}'s phone, in your own words.`,
@@ -156,6 +168,63 @@ function renderExtras() {
     row("📌", `Pin a page to the top · ${SHOP.PINTOP.price} 🪙`, `Keeps one page above everything else on the diary wall for ${SHOP.PINTOP.hours} hours. Open the page in the diary and tap “pin to the top”.`),
     row("🏠", `Pin a picture to the love page · ${Goldies.RULES.PIN_COST} 🪙`, `It joins the photo strip on the first page for ${Goldies.RULES.PIN_DAYS} days. Open a picture in the diary and tap “add to home”.`),
   ].join("");
+}
+
+/* ---------- flowers ---------- */
+function openBouquetBuilder() {
+  if (!KEY || !NAME) return toast("Set this phone up in the diary first 🔑");
+  const pick = {}, state = { wrap: "kraft" };
+  const back = document.createElement("div");
+  back.className = "sheet-back";
+  back.innerHTML = `<div class="sheet small bouquet-sheet"><div class="sheet-head"><h2>A bouquet for ${esc(other())}</h2><button type="button" class="icon-btn close" data-close>✕</button></div>
+    <div class="bq-preview"></div>
+    <div class="bq-list">${Object.entries(SHOP.FLOWERS).map(([id, f]) => `<div class="bq-row"><svg viewBox="-16 -16 32 32" class="bq-ico">${flowerHead(id)}</svg>
+      <span><b>${esc(f.name)}</b><small>${f.price} 🪙 each</small></span><button type="button" class="bq-btn" data-bq="${id}" data-d="-1">−</button><b class="bq-n" data-n="${id}">0</b><button type="button" class="bq-btn" data-bq="${id}" data-d="1">+</button></div>`).join("")}</div>
+    <div class="label">wrapping</div><div class="choices bq-wraps">${Object.entries(SHOP.WRAPS).map(([id, [c]]) => `<button type="button" class="choice${id === "kraft" ? " on" : ""}" data-wrap="${id}"><i style="background:${c}"></i>${id}</button>`).join("")}</div>
+    <input class="field" maxlength="120" placeholder="a little card to go with it (optional)" data-bq-note>
+    <div class="game-actions"><button class="save" data-bq-send disabled>send it 💐</button></div><p class="hint bq-total"></p></div>`;
+  document.body.appendChild(back);
+  const draw = () => {
+    const n = flowerCount(pick), cost = flowerCost(pick), have = myPoints(allPages);
+    $(".bq-preview", back).innerHTML = n ? bouquetSvg(pick, state.wrap) : `<p class="hint">Tap ＋ to add flowers 🌷</p>`;
+    Object.keys(SHOP.FLOWERS).forEach(id => { $(`[data-n="${id}"]`, back).textContent = pick[id] || 0; });
+    $(".bq-total", back).textContent = n ? `${n} ${n === 1 ? "flower" : "flowers"} · ${cost} goldies${cost > have ? ` (you have ${have})` : ""}` : `up to ${SHOP.MAX_STEMS} flowers`;
+    $("[data-bq-send]", back).disabled = !n || cost > have;
+    $("[data-bq-send]", back).textContent = n ? `send it · ${cost} 🪙 💐` : "send it 💐";
+  };
+  back.addEventListener("click", async ev => {
+    if (ev.target === back || ev.target.closest("[data-close]")) return back.remove();
+    const b = ev.target.closest("[data-bq]");
+    if (b) {
+      const id = b.dataset.bq, d = Number(b.dataset.d);
+      if (d > 0 && flowerCount(pick) >= SHOP.MAX_STEMS) return toast(`${SHOP.MAX_STEMS} flowers is a very full bouquet 💐`);
+      pick[id] = Math.max(0, (pick[id] || 0) + d); if (!pick[id]) delete pick[id];
+      return draw();
+    }
+    const w = ev.target.closest("[data-wrap]");
+    if (w) { state.wrap = w.dataset.wrap; $$("[data-wrap]", back).forEach(x => x.classList.toggle("on", x === w)); return draw(); }
+    const send = ev.target.closest("[data-bq-send]");
+    if (send) {
+      const cost = flowerCost(pick), n = flowerCount(pick);
+      if (!canBuy(cost) || !confirm(`Send ${other()} ${n} ${n === 1 ? "flower" : "flowers"} for ${cost} goldies?`)) return;
+      send.disabled = true;
+      if (await buy("flowers", cost, { for: other(), flowers: { ...pick }, wrap: state.wrap, note: $("[data-bq-note]", back).value.trim().slice(0, 120) }, `${NAME} sent flowers`)) {
+        notifyPartner(`💐 ${NAME} sent you flowers`, "Open the diary to see them");
+        back.remove();
+        burst(innerWidth / 2, innerHeight / 2, 24);
+        toast(`💐 On their way to ${other()}`);
+      } else send.disabled = false;
+    }
+  });
+  draw();
+}
+function showFlowers(f) {
+  if (!f) return;
+  const back = document.createElement("div");
+  back.className = "sheet-back";
+  back.innerHTML = `<div class="sheet small surprise-card">${bouquetSvg(f.flowers, f.wrap)}<small>flowers from ${esc(f.by)}</small>${f.note ? `<p>${esc(f.note)}</p>` : ""}<button class="save" data-close>💐</button></div>`;
+  back.addEventListener("click", ev => { if (ev.target === back || ev.target.closest("[data-close]")) back.remove(); });
+  document.body.appendChild(back);
 }
 
 function renderShop() { renderWardrobe(); renderCoupons(); renderThemes(); renderExtras(); }
@@ -194,11 +263,11 @@ document.addEventListener("click", async ev => {
   if (coupon) {
     const id = coupon.dataset.coupon, c = SHOP.coupons[id];
     if (!canBuy(c.price)) return;
-    const note = prompt(`${c.emoji} Dare ${other()}: ${c.name} (${c.price} goldies).\nAdd a note? (optional${id === "truth" ? ", write your question here" : ""})`, "");
+    const note = prompt(`${c.emoji} Dare ${other()}: ${c.name} (${c.price} goldies). They have ${SHOP.DARE_HOURS} hours, or they lose ${2 * c.price}.\nAdd a note? (optional${id === "truth" ? ", write your question here" : ""})`, "");
     if (note === null) return;
     coupon.disabled = true;
-    if (await buy("coupon", c.price, { coupon: id, for: other(), note: note.trim().slice(0, 140), reward: SHOP.COUPON_REWARD }, `${NAME} sent a dare`)) {
-      notifyPartner(`😈 ${NAME} dares you`, `${c.emoji} ${c.name}. Do it, then tap "dare done" in the shop`, "shop.html#coupons");
+    if (await buy("coupon", c.price, { coupon: id, for: other(), note: note.trim().slice(0, 140), reward: SHOP.COUPON_REWARD, hours: SHOP.DARE_HOURS }, `${NAME} sent a dare`)) {
+      notifyPartner(`😈 ${NAME} dares you`, `${c.emoji} ${c.name}. You have ${SHOP.DARE_HOURS} hours, or lose ${2 * c.price} goldies`, "shop.html#coupons");
     }
     coupon.disabled = false;
     return;
@@ -245,6 +314,9 @@ document.addEventListener("click", async ev => {
     if (await buy("gift", n, { for: other(), amount: n }, `${NAME} gifted ${n} goldies`)) notifyPartner(`🎁 ${NAME} gifted you ${n} goldies`, "Just because ♥", "shop.html");
     return;
   }
+  if (t.closest("[data-flowers]")) return openBouquetBuilder();
+  const seeF = t.closest("[data-see-flowers]");
+  if (seeF) return showFlowers(allPages.find(x => x.id === seeF.dataset.seeFlowers));
   if (t.closest("[data-surprise]")) {
     if (!canBuy(SHOP.SURPRISE)) return;
     const note = prompt(`What should the surprise say? It pops up with hearts the next time ${other()} opens the diary.`, "");
@@ -258,7 +330,7 @@ document.addEventListener("click", async ev => {
     if (!note || !note.trim()) return;
     if (await buy("superping", SHOP.SUPERPING, { for: other(), note: note.trim().slice(0, 140) }, `${NAME} sent a super ping`)) {
       const to = NOTIFY_TOPICS[other()];
-      if (to && !LOCAL) fetch("https://ntfy.sh/", { method: "POST", body: JSON.stringify({ topic: to, title: `📣 ${NAME}`, message: note.trim(), priority: 5, tags: ["rotating_light", "love_letter"], click: new URL("./", location.href).href }) }).catch(() => {});
+      if (to && !LOCAL) fetch("https://ntfy.sh/", { method: "POST", body: JSON.stringify({ topic: to, title: `📣 ${NAME}`, message: note.trim(), priority: 5, tags: ["rotating_light", "love_letter"] }) }).catch(() => {});
       toast(`📣 Sent to ${other()}`);
     }
     return;

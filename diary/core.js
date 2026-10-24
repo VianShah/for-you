@@ -300,13 +300,15 @@ async function packMedia(path, blob) {
 
 /* ---------- notifications ---------- */
 // Pings the other person's phone. Never blocks or breaks a save.
-// Tapping it opens the page it was sent from (the diary, or the mini games), or `page` if given.
-function notifyPartner(title, message, page = /games\.html$/.test(location.pathname) ? "games.html" : "./") {
+function notifyPartner(title, message) {
   const to = NAME && NOTIFY_TOPICS[partnerOf(NAME)];
   if (!to || LOCAL) return;
   fetch("https://ntfy.sh/", {
     method: "POST",
-    body: JSON.stringify({ topic: to, title, message, tags: ["love_letter"], click: new URL(page, location.href).href }),
+    // No link on purpose: tapping a link opened the diary in a fresh browser (the ntfy app's
+    // own, or a new tab) that doesn't share this one's storage, so it asked for the secret
+    // word again. Without it, you just go back to the diary you have open; it refreshes itself.
+    body: JSON.stringify({ topic: to, title, message, tags: ["love_letter"] }),
   }).catch(() => {});
 }
 

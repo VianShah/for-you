@@ -79,7 +79,7 @@
   const PAGE_TYPES = ["note", "photo", "video", "voice"];
 
   // Every moment that earned someone points, oldest first.
-  function events(entries, name) {
+  function events(entries, name, now = Date.now()) {
     const out = [{ at: START, pts: RULES.WELCOME, why: "a welcome gift from Goldiee", gift: true }];
     for (const e of entries || []) {
       const at = Date.parse(e.at);
@@ -95,6 +95,10 @@
       if (e.type === "buy" && e.item === "coupon") {
         if (e.thanked && e.for === name && !e.cancelled && Date.parse(e.thanked.at) >= START)
           out.push({ at: Date.parse(e.thanked.at), pts: e.reward || 20, why: "a dare, done 😈", game: true });
+        // A dare with a deadline that wasn't done in time costs the dared one twice its price.
+        const due = dareDue(e);
+        if (due && e.for === name && !e.cancelled && now >= due && !(e.done && Date.parse(e.done.at) <= due))
+          out.push({ at: due, pts: -2 * (e.cost || 0), why: "a dare not done in time ⌛", game: true, fixed: true, noClock: true });
         continue;
       }
       // Goldies gifted in the shop land with the other one (not counted as them being active).
@@ -126,12 +130,12 @@
     }
     // Sleep time doesn't count: things posted then still reset the clock, but earn nothing.
     // A call that starts while you're awake counts in full, even if it runs on past 1 am.
-    for (const x of out) if (!x.gift && !isAwake(x.callStart ?? x.at)) { x.pts = 0; x.why += " (sleep time)"; }
+    for (const x of out) if (!x.gift && !x.fixed && !isAwake(x.callStart ?? x.at)) { x.pts = 0; x.why += " (sleep time)"; }
     return out.sort((a, b) => a.at - b.at);
   }
 
   function score(entries, name, now = Date.now()) {
-    const ev = events(entries, name);
+    const ev = events(entries, name, now);
     const earned = ev.reduce((s, x) => s + x.pts, 0);
     // −50 for each full 3.5 awake hours between activities; any activity resets the clock.
     // A quiet-day shield from the shop pauses the clock, like sleep time, while it lasts.
@@ -161,14 +165,17 @@
       nextPenaltyIn: (RULES.GAP_MIN * MIN - sinceLast) / MIN, // awake minutes until the next −50
       nextPenaltyAt: addAwake(shield ? shield.to : now, RULES.GAP_MIN * MIN - sinceLast), // the moment it lands (sleep time and shields pause it)
       shieldUntil: shield ? shield.to : null,
-      lastActive: ev.filter(x => !x.gift).pop()?.at ?? null,
+      lastActive: ev.filter(x => !x.gift && !x.noClock).pop()?.at ?? null,
       history: [...ev, ...penalties, ...bets, ...shopHistory(entries, name)].sort((a, b) => b.at - a.at),
     };
   }
 
+  // When a dare has to be done by (dares bought with a time limit, `hours`), or null.
+  const dareDue = e => e.hours ? Date.parse(e.at) + e.hours * 3600000 : null;
+
   // Shop purchases, for the "your last goldies" list.
   const SHOP_WHY = { outfit: "an outfit for Goldiee 🐶", theme: "a diary backdrop for the day 🎨", peek: "a peek at an answer 👀", coupon: "a dare 😈",
-    gift: "goldies gifted 🎁", shield: "a quiet-day shield 🛡", pintop: "a page pinned to the top 📌", surprise: "a surprise popup 🎉", superping: "a super ping 📣" };
+    gift: "goldies gifted 🎁", shield: "a quiet-day shield 🛡", pintop: "a page pinned to the top 📌", surprise: "a surprise popup 🎉", superping: "a super ping 📣", flowers: "flowers 💐" };
   const shopHistory = (entries, name) => (entries || []).filter(e => e.type === "buy" && e.by === name && !e.cancelled && e.cost)
     .map(e => ({ at: Date.parse(e.at), pts: -e.cost, why: SHOP_WHY[e.item] || "the shop" }));
 
@@ -202,5 +209,5 @@
 
   // Is a pin still on the love page? ({ at } from entry.pin)
   const pinLive = (pin, now = Date.now()) => !!pin && now - Date.parse(pin.at) < RULES.PIN_DAYS * DAY * MIN;
-  globalThis.Goldies = { pinLive, RULES, awakeMinutes, awakeMs, addAwake, isAwake, events, score, streak, textPoints, races };
+  globalThis.Goldies = { dareDue, pinLive, RULES, awakeMinutes, awakeMs, addAwake, isAwake, events, score, streak, textPoints, races };
 })();

@@ -5,7 +5,6 @@
 import fs from "node:fs";
 
 const PEOPLE = ["Vian", "Jovena"];
-const DIARY_URL = "https://vianshah.github.io/for-you/diary/";
 const read = p => fs.readFileSync(new URL("../" + p, import.meta.url), "utf8");
 
 globalThis.window = globalThis;
@@ -41,7 +40,7 @@ if (process.env.TEST === "true" || process.env.TEST === "1") {
   for (const name of PEOPLE) {
     if (!topics[name]) continue;
     const res = await fetch("https://ntfy.sh/", { method: "POST", body: JSON.stringify({
-      topic: topics[name], title: "🔔 Test from the diary", message: `Hi ${name}! If you can read this, notifications work 💌`, tags: ["love_letter"], click: DIARY_URL }) });
+      topic: topics[name], title: "🔔 Test from the diary", message: `Hi ${name}! If you can read this, notifications work 💌`, tags: ["love_letter"] }) });
     console.log(`test sent to ${name}: ${res.status}`);
   }
   process.exit(0);
@@ -63,8 +62,7 @@ for (const name of PEOPLE) {
       topic,
       title: "😢 Goldiee is crying",
       message: `${name} is at ${s.points} goldies${quiet ? ` and hasn't written in ${quiet} h` : ""}. Send them a little nudge?`,
-      tags: ["cry"],
-      click: DIARY_URL,
+      tags: ["cry"], // no link: it would open a fresh browser that asks for the secret word
     }),
   });
   console.log(`  pinged ${other}: ${res.status}`);

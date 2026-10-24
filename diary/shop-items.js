@@ -46,6 +46,7 @@ const SHOP = {
     truth:    { name: "Answer one question, honestly",      emoji: "🙊", price: 60,  hint: "I ask in the note, you answer, no dodging" },
   },
   COUPON_REWARD: 20,
+  DARE_HOURS: 48, // not done in time? the dared one loses twice the dare's price
   // Little extras.
   GIFTS: [50, 100],                 // send the other one some goldies
   SHIELD: { price: 120, hours: 12 },  // no −50s for you for 12 hours (exams, travel, a busy day)
@@ -122,3 +123,56 @@ const OUTFIT_SVG = {
     <path d="M47 43.5q3-2 6 0" stroke="#1d1416" stroke-width="2.2" fill="none"/><path d="M30 43l-6-3M70 43l6-3" stroke="#1d1416" stroke-width="2"/>
     <path d="M33 42l5 0M56 42l5 0" stroke="#fff" stroke-width="1.4" stroke-linecap="round" opacity=".7"/></g>`,
 };
+
+/* ---------- flowers 💐: build a bouquet, stem by stem ---------- */
+SHOP.FLOWERS = {
+  rose:      { name: "Rose",      price: 50, color: "#d1283a" },
+  lily:      { name: "Lily",      price: 70, color: "#fff7f2" },
+  tulip:     { name: "Tulip",     price: 40, color: "#f2789a" },
+  sunflower: { name: "Sunflower", price: 60, color: "#ffc93c" },
+  daisy:     { name: "Daisy",     price: 20, color: "#ffffff" },
+  orchid:    { name: "Orchid",    price: 90, color: "#b46ad8" },
+  lotus:     { name: "Lotus",     price: 80, color: "#f5a3c0" },
+  marigold:  { name: "Marigold",  price: 25, color: "#ff9a1f" },
+};
+SHOP.WRAPS = { kraft: ["#d9b38c", "#c49a6c"], blush: ["#f7cfd6", "#eeb3be"], ivory: ["#fbf3e6", "#eadcc5"], midnight: ["#3a2a4a", "#2a1d38"] };
+SHOP.MAX_STEMS = 24;
+const flowerCount = f => Object.values(f || {}).reduce((s, n) => s + n, 0);
+const flowerCost = f => Object.entries(f || {}).reduce((s, [id, n]) => s + (SHOP.FLOWERS[id]?.price || 0) * n, 0);
+
+// One flower head, centred on 0,0, about 30 across.
+function flowerHead(id) {
+  const ring = (n, rx, ry, dist, fill, extra = "") => Array.from({ length: n }, (_, i) =>
+    `<ellipse cx="0" cy="${-dist}" rx="${rx}" ry="${ry}" fill="${fill}" ${extra} transform="rotate(${i * 360 / n})"/>`).join("");
+  switch (id) {
+    case "rose": return `<circle r="13" fill="#b51d30"/><circle r="10" fill="#d1283a"/><path d="M-6 -2a6 6 0 1 1 8 6M-3 -1a3 3 0 1 1 4 3" stroke="#8e1424" stroke-width="1.6" fill="none"/>`;
+    case "lily": return `${ring(6, 4.5, 13, 9, "#fff7f2", 'stroke="#f2c6d0" stroke-width="1"')}${ring(6, 1, 7, 7, "#f39aa6")}<circle r="3" fill="#ffd23f"/>`;
+    case "tulip": return `<path d="M-11 -2c0-9 4-14 11-14s11 5 11 14c0 9-5 13-11 13s-11-4-11-13z" fill="#f2789a"/><path d="M-11 -6l6 6 5-11 5 11 6-6" fill="#e05a80"/>`;
+    case "sunflower": return `${ring(14, 3.6, 8, 11, "#ffc93c")}<circle r="8" fill="#6b3d1f"/><circle r="5" fill="#4a2a14"/>`;
+    case "daisy": return `${ring(12, 2.8, 8, 8, "#ffffff", 'stroke="#eee" stroke-width=".6"')}<circle r="4.5" fill="#ffc93c"/>`;
+    case "orchid": return `${ring(5, 6, 10, 7, "#c98be6")}<path d="M-4 1q4 9 8 0q-4 4-8 0z" fill="#8a3fb3"/><circle r="2.4" fill="#fff1a8"/>`;
+    case "lotus": return `<path d="M0 6c-14-2-16-12-13-16 6 2 10 8 13 16zM0 6c14-2 16-12 13-16-6 2-10 8-13 16z" fill="#f08bb0"/><path d="M0 6c-7-6-7-15 0-20 7 5 7 14 0 20z" fill="#f5a3c0"/><path d="M0 6c-9 0-15-4-17-8M0 6c9 0 15-4 17-8" stroke="#e57aa3" stroke-width="1.4" fill="none"/>`;
+    case "marigold": return `<circle r="12" fill="#f07a10"/>${ring(10, 4, 5, 8, "#ff9a1f")}<circle r="6" fill="#ffb53f"/><circle r="3" fill="#f07a10"/>`;
+  }
+  return "";
+}
+// The whole bouquet: heads in a natural cluster, stems, and a paper cone with a ribbon.
+function bouquetSvg(flowers, wrap = "kraft") {
+  const heads = Object.entries(flowers || {}).flatMap(([id, n]) => Array(n).fill(id));
+  // Mix them up the same way every time, so the same bouquet always looks the same.
+  heads.splice(0, heads.length, ...heads.map((id, i) => ({ id, k: hash(id + i) })).sort((a, b) => a.k - b.k).map(x => x.id));
+  const n = heads.length, R = 18 + Math.sqrt(n) * 13;
+  const pos = heads.map((id, i) => {
+    const r = n === 1 ? 0 : R * Math.sqrt((i + .5) / n), a = i * 2.39996;
+    return { id, x: 100 + r * Math.cos(a), y: 92 + r * Math.sin(a) * .7, s: n > 12 ? .85 : 1 };
+  });
+  const [w1, w2] = SHOP.WRAPS[wrap] || SHOP.WRAPS.kraft;
+  const stems = pos.map(p => `<path d="M${p.x.toFixed(1)} ${p.y.toFixed(1)} Q${((p.x + 100) / 2).toFixed(1)} ${(p.y + 60).toFixed(1)} 100 196" stroke="#5a9a4a" stroke-width="2" fill="none"/>`).join("");
+  const leaves = n ? `<path d="M100 150q-34-6-40-34q26 6 40 34zM100 150q34-6 40-34q-26 6-40 34z" fill="#6aa84f"/>` : "";
+  const flowersSvg = pos.sort((a, b) => a.y - b.y).map(p => `<g transform="translate(${p.x.toFixed(1)} ${p.y.toFixed(1)}) scale(${p.s})">${flowerHead(p.id)}</g>`).join("");
+  return `<svg class="bouquet" viewBox="0 0 200 240" aria-hidden="true">${stems}${leaves}
+    <path d="M46 128 L100 234 L154 128 Q100 146 46 128z" fill="${w1}"/><path d="M46 128 L100 234 L84 136z" fill="${w2}" opacity=".7"/>
+    ${flowersSvg}
+    <path d="M100 196c-12-10-24-8-22 0s14 4 22 0zm0 0c12-10 24-8 22 0s-14 4-22 0z" fill="#d97b86"/><path d="M98 198l-8 18M102 198l8 18" stroke="#d97b86" stroke-width="3" stroke-linecap="round"/><circle cx="100" cy="197" r="4" fill="#c4566a"/></svg>`;
+}
+const flowersFor = (list, name) => buys(list, "flowers").filter(e => e.for === name).sort((a, b) => Date.parse(b.at) - Date.parse(a.at));
