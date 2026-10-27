@@ -625,8 +625,9 @@ function syncPicks() {
   tray.hidden = !state.picks.length;
   tray.innerHTML = state.picks.map((p, i) => `<button type="button" class="tray-pic${p.on ? " on" : ""}" data-pick="${i}" aria-label="picture ${i + 1}${p.on ? ", will be sent" : ", left out"}"><img src="${p.url}" alt=""><span class="tray-tick">${p.on ? on.indexOf(p) + 1 : ""}</span></button>`).join("");
   $("#trayHint").hidden = !state.picks.length;
-  $("#trayHint").textContent = state.picks.length > 1 ? `${on.length} of ${state.picks.length} will be sent · tap a picture to leave it out or put it back` : "tap the picture to leave it out";
+  $("#trayHint").textContent = state.picks.length > 1 ? `${on.length} of ${state.picks.length} will be sent · tap one to see it big · tap its number to leave it out` : "tap the picture to see it big · tap its number to leave it out";
   $("#flipBtn").hidden = !on.length;
+  $("#camBtnLabel").textContent = state.picks.length ? "add more pictures" : "add pictures";
   updatePreview();
 }
 async function addPics(srcs) {
@@ -640,15 +641,21 @@ async function addPics(srcs) {
   }
   syncPicks();
 }
+// In the tray: tap a picture to see it big (pinch to zoom), tap its number to leave it out or put it back.
+function togglePick(list, p) {
+  if (!p.on && list.filter(x => x.on).length >= MAX_PHOTOS) { toast(`Up to ${MAX_PHOTOS} pictures on one page`); return false; }
+  p.on = !p.on;
+  return true;
+}
 $("#photoTray").addEventListener("click", e => {
   const b = e.target.closest("[data-pick]"); if (!b) return;
-  const p = state.picks[Number(b.dataset.pick)];
-  if (!p.on && state.picks.filter(x => x.on).length >= MAX_PHOTOS) return toast(`Up to ${MAX_PHOTOS} pictures on one page`);
-  p.on = !p.on;
-  syncPicks();
+  const i = Number(b.dataset.pick);
+  if (e.target.closest(".tray-tick")) { if (togglePick(state.picks, state.picks[i])) syncPicks(); return; }
+  openViewer(state.picks, i, syncPicks);
 });
-$("#photoInput").addEventListener("change", async e => {
-  const files = [...e.target.files]; e.target.value = ""; if (!files.length) return;
+// Pictures (or one video) picked from the phone's photos.
+async function handlePicked(files) {
+  if (!files.length) return;
   // A video goes up as it is (no shrinking); it becomes a "video" page, on its own.
   if (files.length === 1 && isVideoFile(files[0])) {
     const file = files[0];
@@ -666,56 +673,190 @@ $("#photoInput").addEventListener("change", async e => {
   const pics = files.filter(f => !isVideoFile(f));
   if (pics.length < files.length) toast("Videos go on a page of their own, so just the pictures this time.");
   addPics(pics);
+}
+$("#photoInput").addEventListener("change", e => {
+  const files = [...e.target.files]; e.target.value = "";
+  handlePicked(files);
 });
 
-// The diary's own camera: keep tapping the shutter, every shot lands in the tray.
+// One button: the diary's own camera. Take as many as you like, pinch or tap 1× 2× 3× to zoom,
+// 🖼 to add from your photos, tap a shot to see it big, and only the ticked ones go on the page.
 let camFacing = "environment";
 $("#camBtn").addEventListener("click", openCamera);
 async function openCamera() {
   const back = document.createElement("div");
   back.className = "sheet-back multicam";
   back.innerHTML = `<div class="mc-stage"><video playsinline muted autoplay></video><div class="mc-flash"></div>
-      <button type="button" class="mc-close" data-close aria-label="Done">✕</button></div>
-    <div class="mc-strip"></div>
-    <div class="mc-bar"><button type="button" class="mc-flip" aria-label="Switch camera">🔄</button>
+      <button type="button" class="mc-flip" aria-label="Switch camera">🔄</button>
+      <button type="button" class="mc-close" data-close aria-label="Done">✕</button>
+      <p class="mc-msg" hidden>The camera is off. Allow camera access for this site, or tap 🖼 to choose from your photos.</p>
+      <div class="mc-zoom">${[1, 2, 3].map(z => `<button type="button" data-zoom="${z}">${z}×</button>`).join("")}</div></div>
+    <div class="mc-strip"><span class="mc-empty">your shots land here · tap one to see it big</span></div>
+    <div class="mc-bar"><label class="mc-gallery" aria-label="Choose from your photos">🖼<input type="file" accept="image/*,video/*" multiple hidden></label>
       <button type="button" class="mc-shutter" aria-label="Take a picture"><i></i></button>
       <button type="button" class="mc-done" data-close>done</button></div>`;
   document.body.appendChild(back);
-  const video = $("video", back), shots = [];
-  let stream = null;
+  const video = $("video", back), stage = $(".mc-stage", back), shots = [];
+  let stream = null, zoom = 1, hwZoom = null;
   const stop = () => stream?.getTracks().forEach(t => t.stop());
+  const close = () => { stop(); back.remove(); };
+
+  function setZoom(z) {
+    zoom = Math.min(5, Math.max(1, z));
+    const mirror = camFacing === "user" ? " scaleX(-1)" : "";
+    if (hwZoom) {
+      // the phone zooms its own lens: sharper than stretching the picture
+      const track = stream?.getVideoTracks()[0];
+      track?.applyConstraints({ advanced: [{ zoom: Math.min(hwZoom.max, Math.max(hwZoom.min, hwZoom.min * zoom)) }] }).catch(() => {});
+      video.style.transform = mirror.trim();
+    } else video.style.transform = `scale(${zoom})${mirror}`;
+    $$("[data-zoom]", back).forEach(b => {
+      const z0 = Number(b.dataset.zoom), next = Number(b.nextElementSibling?.dataset.zoom || 99);
+      const here = zoom >= z0 - .05 && zoom < next - .05;
+      b.classList.toggle("on", here);
+      b.textContent = here && Math.abs(zoom - z0) > .05 ? `${zoom.toFixed(1)}×` : `${z0}×`;
+    });
+  }
   async function start() {
     stop();
     try {
       stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: camFacing, width: { ideal: 1920 }, height: { ideal: 1920 } }, audio: false });
-      video.srcObject = stream; video.classList.toggle("mirror", camFacing === "user");
+      video.srcObject = stream;
+      const caps = stream.getVideoTracks()[0].getCapabilities?.();
+      hwZoom = caps?.zoom && caps.zoom.max > caps.zoom.min ? caps.zoom : null;
+      $(".mc-msg", back).hidden = true;
+      setZoom(1);
       await video.play().catch(() => {});
-    } catch { back.remove(); toast("The camera didn't open. Allow camera access, or use “your photos”."); }
+    } catch { $(".mc-msg", back).hidden = false; }
   }
   const strip = () => {
-    $(".mc-strip", back).innerHTML = shots.map(s => `<img src="${s.url}" alt="">`).join("");
-    $(".mc-done", back).textContent = shots.length ? `done · ${shots.length} 📷` : "done";
+    const on = shots.filter(s => s.on);
+    $(".mc-strip", back).innerHTML = shots.length
+      ? shots.map((s, i) => `<button type="button" class="mc-shot${s.on ? " on" : ""}" data-shot="${i}"><img src="${s.url}" alt=""><span class="tray-tick">${s.on ? on.indexOf(s) + 1 : ""}</span></button>`).join("")
+      : `<span class="mc-empty">your shots land here · tap one to see it big</span>`;
+    $(".mc-done", back).textContent = shots.length ? `send ${on.length} ✓` : "done";
     $(".mc-strip", back).scrollLeft = 1e6;
   };
+  const addShot = (blob, url) => { shots.push({ blob, url: url || URL.createObjectURL(blob), on: shots.filter(s => s.on).length < MAX_PHOTOS }); };
+
+  // pinch the live picture to zoom
+  let pinch = null;
+  const gap = t => Math.hypot(t[0].clientX - t[1].clientX, t[0].clientY - t[1].clientY);
+  stage.addEventListener("touchstart", e => { if (e.touches.length === 2) pinch = { d: gap(e.touches), z: zoom }; }, { passive: true });
+  stage.addEventListener("touchmove", e => { if (pinch && e.touches.length === 2) { e.preventDefault(); setZoom(pinch.z * gap(e.touches) / pinch.d); } }, { passive: false });
+  stage.addEventListener("touchend", e => { if (e.touches.length < 2) pinch = null; });
+  stage.addEventListener("gesturestart", e => e.preventDefault());
+  stage.addEventListener("wheel", e => { e.preventDefault(); setZoom(zoom * (e.deltaY < 0 ? 1.1 : 1 / 1.1)); }, { passive: false });
+
+  $("input", back).addEventListener("change", e => {
+    const files = [...e.target.files]; e.target.value = ""; if (!files.length) return;
+    if (files.length === 1 && isVideoFile(files[0])) { // a video makes its own page
+      close();
+      const keep = shots.filter(s => s.on);
+      if (keep.length) toast("A video goes on its own page, so your shots were left out.");
+      return handlePicked(files);
+    }
+    const pics = files.filter(f => !isVideoFile(f));
+    if (pics.length < files.length) toast("Videos go on a page of their own, so just the pictures this time.");
+    pics.forEach(f => addShot(f));
+    strip();
+  });
+
   back.addEventListener("click", async ev => {
     if (ev.target.closest(".mc-shutter")) {
       if (!video.videoWidth) return;
-      const c = document.createElement("canvas"); c.width = video.videoWidth; c.height = video.videoHeight;
+      // what you see is what you get: with stretch-zoom, keep just the middle of the picture
+      const z = hwZoom ? 1 : zoom, vw = video.videoWidth, vh = video.videoHeight, sw = vw / z, sh = vh / z;
+      const c = document.createElement("canvas"); c.width = Math.round(sw); c.height = Math.round(sh);
       const ctx = c.getContext("2d");
       if (camFacing === "user") { ctx.translate(c.width, 0); ctx.scale(-1, 1); } // like the preview, the way you see yourself
-      ctx.drawImage(video, 0, 0);
+      ctx.drawImage(video, (vw - sw) / 2, (vh - sh) / 2, sw, sh, 0, 0, c.width, c.height);
       const blob = await new Promise(r => c.toBlob(r, "image/jpeg", .9));
-      shots.push({ blob, url: URL.createObjectURL(blob) });
+      addShot(blob);
       const f = $(".mc-flash", back); f.classList.remove("go"); void f.offsetWidth; f.classList.add("go");
       return strip();
     }
+    const z = ev.target.closest("[data-zoom]");
+    if (z) return setZoom(Number(z.dataset.zoom));
+    const s = ev.target.closest("[data-shot]");
+    if (s) {
+      const i = Number(s.dataset.shot);
+      if (ev.target.closest(".tray-tick")) { togglePick(shots, shots[i]); return strip(); }
+      return openViewer(shots, i, strip);
+    }
     if (ev.target.closest(".mc-flip")) { camFacing = camFacing === "user" ? "environment" : "user"; return start(); }
     if (ev.target.closest("[data-close]")) {
-      stop(); back.remove();
-      if (shots.length) addPics(shots.map(s => s.blob));
+      close();
+      const keep = shots.filter(s => s.on);
+      if (keep.length) addPics(keep.map(s => s.blob));
     }
   });
-  start(); strip();
+  setZoom(1); start(); strip();
+}
+
+// See one picture big: pinch or double-tap to zoom, drag to look around, swipe for the next one,
+// and tick whether it gets sent. `list` items are { url, on }; `changed` redraws whoever opened it.
+function openViewer(list, index, changed) {
+  const v = document.createElement("div");
+  v.className = "pv";
+  v.innerHTML = `<div class="pv-top"><button type="button" class="pv-back">‹ back</button><span class="pv-count"></span></div>
+    <div class="pv-stage"><img alt=""></div>
+    <div class="pv-bar"><button type="button" class="pv-pick"></button></div>`;
+  document.body.appendChild(v);
+  const img = $("img", v), stageEl = $(".pv-stage", v);
+  let i = index, s = 1, tx = 0, ty = 0;
+  const apply = (anim) => {
+    const mx = (s - 1) * stageEl.clientWidth / 2, my = (s - 1) * stageEl.clientHeight / 2;
+    tx = Math.max(-mx, Math.min(mx, tx)); ty = Math.max(-my, Math.min(my, ty));
+    img.style.transition = anim ? "transform .2s" : "none";
+    img.style.transform = `translate(${tx}px,${ty}px) scale(${s})`;
+  };
+  const show = () => {
+    const p = list[i]; s = 1; tx = ty = 0; apply();
+    img.src = p.url;
+    const on = list.filter(x => x.on).length;
+    $(".pv-count", v).textContent = `${i + 1} of ${list.length} · ${on} to send`;
+    const b = $(".pv-pick", v);
+    b.classList.toggle("on", p.on);
+    b.textContent = p.on ? "✓ this one will be sent" : "＋ send this one";
+  };
+  const go = d => { if (list[i + d]) { i += d; show(); } };
+  v.addEventListener("click", e => {
+    if (e.target.closest(".pv-back")) { v.remove(); return changed(); }
+    if (e.target.closest(".pv-pick")) { togglePick(list, list[i]); show(); changed(); }
+  });
+  // touch: two fingers zoom, one finger drags (zoomed) or swipes (not zoomed), double-tap zooms
+  let t0 = null, lastTap = 0, touched = 0;
+  stageEl.addEventListener("touchstart", e => {
+    const t = e.touches; touched = Date.now();
+    if (t.length === 2) t0 = { pinch: true, d: Math.hypot(t[0].clientX - t[1].clientX, t[0].clientY - t[1].clientY), s };
+    else if (t.length === 1) {
+      t0 = { x: t[0].clientX, y: t[0].clientY, tx, ty, at: Date.now() };
+      if (Date.now() - lastTap < 300) { s = s > 1 ? 1 : 2.5; tx = ty = 0; apply(true); t0 = null; lastTap = 0; return; }
+      lastTap = Date.now();
+    }
+  }, { passive: true });
+  stageEl.addEventListener("touchmove", e => {
+    if (!t0) return;
+    e.preventDefault();
+    const t = e.touches;
+    if (t0.pinch && t.length === 2) { s = Math.min(5, Math.max(1, t0.s * Math.hypot(t[0].clientX - t[1].clientX, t[0].clientY - t[1].clientY) / t0.d)); apply(); }
+    else if (!t0.pinch && t.length === 1 && s > 1) { tx = t0.tx + t[0].clientX - t0.x; ty = t0.ty + t[0].clientY - t0.y; apply(); }
+  }, { passive: false });
+  stageEl.addEventListener("touchend", e => {
+    if (t0 && !t0.pinch && s === 1 && e.changedTouches[0]) {
+      const dx = e.changedTouches[0].clientX - t0.x;
+      if (Math.abs(dx) > 60) go(dx < 0 ? 1 : -1);
+    }
+    if (s < 1.05) { s = 1; tx = ty = 0; apply(true); }
+    if (!e.touches.length) t0 = null;
+  });
+  stageEl.addEventListener("gesturestart", e => e.preventDefault());
+  stageEl.addEventListener("wheel", e => { e.preventDefault(); s = Math.min(5, Math.max(1, s * (e.deltaY < 0 ? 1.15 : 1 / 1.15))); apply(); }, { passive: false });
+  stageEl.addEventListener("dblclick", () => { if (Date.now() - touched < 1000) return; s = s > 1 ? 1 : 2.5; tx = ty = 0; apply(true); });
+  v.tabIndex = -1; v.focus();
+  v.addEventListener("keydown", e => { if (e.key === "ArrowRight") go(1); if (e.key === "ArrowLeft") go(-1); if (e.key === "Escape") { v.remove(); changed(); } });
+  show();
 }
 
 // ↔ flip the chosen pictures before they're saved (front-camera selfies come out reversed).

@@ -807,11 +807,12 @@ body[data-day-theme="photo"]::before { background: linear-gradient(rgba(251,245,
 .pick-btn span { font-size: 26px; }
 .pick-btn b { font-weight: 400; font-size: 15px; }
 .pick-btn small { font-size: 12px; color: var(--muted); }
+.pick-btn.one { width: 100%; margin-bottom: 10px; padding: 18px 12px; }
 .tray { display: grid; grid-template-columns: repeat(auto-fill, minmax(72px, 1fr)); gap: 6px; margin-bottom: 4px; }
 .tray-pic { position: relative; padding: 0; aspect-ratio: 1; border-radius: 10px; overflow: hidden; border: 3px solid transparent; opacity: .45; filter: grayscale(.6); transition: opacity .15s, filter .15s; }
 .tray-pic.on { border-color: var(--wine); opacity: 1; filter: none; }
 .tray-pic img { width: 100%; height: 100%; object-fit: cover; display: block; }
-.tray-tick { position: absolute; top: 4px; right: 4px; min-width: 22px; height: 22px; border-radius: 11px; display: grid; place-items: center; font-size: 12px; background: rgba(255,255,255,.85); border: 2px solid #fff; color: transparent; }
+.tray-tick { position: absolute; top: 4px; right: 4px; min-width: 26px; height: 26px; border-radius: 13px; display: grid; place-items: center; font-size: 12px; background: rgba(255,255,255,.85); border: 2px solid #fff; color: transparent; }
 .tray-pic.on .tray-tick { background: var(--wine); color: #fff; }
 .tray-hint { text-align: left; margin-bottom: 10px; }
 #videoPreview { width: 100%; max-height: 300px; border-radius: 12px; margin-bottom: 10px; background: #1a1214; }
@@ -819,16 +820,35 @@ body[data-day-theme="photo"]::before { background: linear-gradient(rgba(251,245,
 
 /* the diary's own camera: many shots in one go */
 .multicam { z-index: 85; background: #000; display: flex; flex-direction: column; padding: 0; }
-.mc-stage { position: relative; flex: 1; min-height: 0; }
+.mc-stage { position: relative; flex: 1; min-height: 0; overflow: hidden; touch-action: none; }
 .mc-stage video { width: 100%; height: 100%; object-fit: cover; display: block; }
-.mc-stage video.mirror { transform: scaleX(-1); }
+.mc-stage video { transform-origin: center; }
 .mc-flash { position: absolute; inset: 0; background: #fff; opacity: 0; pointer-events: none; }
 .mc-flash.go { animation: flash .35s ease-out; }
 .mc-close { position: absolute; top: max(14px, env(safe-area-inset-top)); right: 14px; width: 44px; height: 44px; border-radius: 50%; background: rgba(0,0,0,.45); color: #fff; font-size: 18px; }
 .mc-strip { display: flex; gap: 6px; overflow-x: auto; padding: 8px 12px; min-height: 76px; background: #111; }
 .mc-strip img { height: 60px; width: 60px; object-fit: cover; border-radius: 8px; flex: none; animation: up .25s both; }
 .mc-bar { display: grid; grid-template-columns: 1fr auto 1fr; align-items: center; padding: 14px 20px calc(18px + env(safe-area-inset-bottom)); background: #111; }
-.mc-flip { justify-self: start; width: 48px; height: 48px; border-radius: 50%; background: rgba(255,255,255,.12); font-size: 22px; }
+.mc-flip { position: absolute; top: max(14px, env(safe-area-inset-top)); left: 14px; width: 44px; height: 44px; border-radius: 50%; background: rgba(0,0,0,.45); font-size: 20px; }
+.mc-gallery { justify-self: start; width: 52px; height: 52px; border-radius: 12px; background: rgba(255,255,255,.14); border: 2px solid rgba(255,255,255,.5); display: grid; place-items: center; font-size: 24px; cursor: pointer; }
+.mc-zoom { position: absolute; left: 50%; bottom: 14px; transform: translateX(-50%); display: flex; gap: 6px; padding: 4px; border-radius: 999px; background: rgba(0,0,0,.4); }
+.mc-zoom button { min-width: 40px; height: 32px; border-radius: 999px; color: #fff; font-size: 13px; background: transparent; }
+.mc-zoom button.on { background: rgba(255,255,255,.9); color: #000; font-weight: 500; }
+.mc-msg { position: absolute; left: 24px; right: 24px; top: 40%; color: #fff; text-align: center; font-size: 15px; line-height: 1.5; }
+.mc-shot { position: relative; flex: none; width: 60px; height: 60px; padding: 0; border-radius: 9px; overflow: hidden; border: 2px solid transparent; opacity: .45; animation: up .25s both; }
+.mc-shot.on { border-color: #fff; opacity: 1; }
+.mc-shot img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.mc-shot .tray-tick { top: 2px; right: 2px; min-width: 20px; height: 20px; font-size: 11px; }
+.mc-empty { color: rgba(255,255,255,.5); font-size: 13px; align-self: center; padding-left: 4px; }
+/* one picture, big: pinch to zoom, tick to send */
+.pv { position: fixed; inset: 0; z-index: 95; background: #000; display: flex; flex-direction: column; outline: none; }
+.pv-top { display: flex; justify-content: space-between; align-items: center; padding: max(12px, env(safe-area-inset-top)) 14px 10px; color: #fff; font-size: 14px; }
+.pv-back { color: #fff; font-size: 16px; padding: 8px 14px; border-radius: 999px; background: rgba(255,255,255,.14); }
+.pv-stage { flex: 1; min-height: 0; overflow: hidden; display: grid; place-items: center; touch-action: none; }
+.pv-stage img { max-width: 100%; max-height: 100%; object-fit: contain; transform-origin: center; user-select: none; -webkit-user-drag: none; }
+.pv-bar { padding: 12px 20px calc(16px + env(safe-area-inset-bottom)); display: grid; }
+.pv-pick { padding: 14px; border-radius: 999px; font-size: 16px; color: #fff; background: rgba(255,255,255,.16); }
+.pv-pick.on { background: var(--wine); }
 .mc-shutter { width: 76px; height: 76px; border-radius: 50%; border: 4px solid #fff; background: transparent; display: grid; place-items: center; }
 .mc-shutter i { width: 60px; height: 60px; border-radius: 50%; background: #fff; transition: transform .1s; }
 .mc-shutter:active i { transform: scale(.88); }
