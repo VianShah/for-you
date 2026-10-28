@@ -30,4 +30,5 @@ jobs:
       - run: node .github/goldiee-robot.mjs
         env:
           VAULT_KEY: ${{ secrets.VAULT_KEY }}
+          VAPID_PRIVATE: ${{ secrets.VAPID_PRIVATE }}
           TEST: ${{ inputs.test }}

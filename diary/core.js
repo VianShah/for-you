@@ -300,17 +300,76 @@ async function packMedia(path, blob) {
 
 /* ---------- notifications ---------- */
 // Pings the other person's phone. Never blocks or breaks a save.
-function notifyPartner(title, message) {
-  const to = NAME && NOTIFY_TOPICS[partnerOf(NAME)];
-  if (!to || LOCAL) return;
-  fetch("https://ntfy.sh/", {
-    method: "POST",
-    // No link on purpose: tapping a link opened the diary in a fresh browser (the ntfy app's
-    // own, or a new tab) that doesn't share this one's storage, so it asked for the secret
-    // word again. Without it, you just go back to the diary you have open; it refreshes itself.
-    body: JSON.stringify({ topic: to, title, message, tags: ["love_letter"] }),
-  }).catch(() => {});
+// Notifications go through GitHub: the diary asks the repo's "notify" robot (.github/workflows/notify.yml)
+// to send the other phone a real notification. Tapping it opens the diary app from the home screen,
+// where the secret word is already remembered. Phones without that set up get the old ntfy ping.
+// `page` is where the tap should land, relative to diary/ (e.g. "games.html", "shop.html#coupons").
+function notifyPartner(title, message, page) {
+  const to = NAME && partnerOf(NAME);
+  if (!to || LOCAL || !KEY) return;
+  if (!page) page = /mini games/i.test(message + title) ? "games.html" : "./";
+  const u = new URL(page, location.origin + "/" + REPO + "/diary/"), url = (u.pathname + u.hash).replace("/" + REPO + "/", "");
+  fetch(`https://api.github.com/repos/${OWNER}/${REPO}/dispatches`, {
+    method: "POST", headers: headers(),
+    body: JSON.stringify({ event_type: "notify", client_payload: { to, title, message, url } }),
+  }).then(r => { if (!r.ok) throw r; }).catch(() => ntfyPartner(to, title, message));
 }
+function ntfyPartner(to, title, message) {
+  const topic = NOTIFY_TOPICS[to];
+  if (!topic) return;
+  fetch("https://ntfy.sh/", { method: "POST", body: JSON.stringify({ topic, title, message, tags: ["love_letter"] }) }).catch(() => {});
+}
+
+/* ---------- notifications on this phone 🔔 (web push) ---------- */
+const VAPID_PUBLIC = "BAtscJGZ_lyQig8866R2cuR_-rotxNMLBw9GgsimXVw9IxlsPV4yqLRpI803yI0iyF17qMhYEWMvL4k4nQLu5qU";
+const PUSH_FILE = "diary/push.json"; // { Vian: [subscription…], Jovena: [...] }, encrypted like the diary
+const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) || (navigator.platform === "MacIntel" && navigator.maxTouchPoints > 1);
+const isStandalone = () => matchMedia("(display-mode: standalone)").matches || navigator.standalone === true;
+const pushSupported = () => "serviceWorker" in navigator && "PushManager" in window && "Notification" in window;
+// "on": this phone gets notifications · "off": it could, tap to turn on · "blocked": said no in the past
+// "homescreen": an iPhone in Safari, it has to be opened from the home screen first · "no": can't here
+function pushState() {
+  if (isIOS && !isStandalone()) return "homescreen";
+  if (!pushSupported()) return "no";
+  if (Notification.permission === "denied") return "blocked";
+  return Notification.permission === "granted" && store.get("push-on") === NAME ? "on" : "off";
+}
+function swRegister() {
+  if (!("serviceWorker" in navigator) || LOCAL) return null;
+  return navigator.serviceWorker.register("/" + REPO + "/sw.js", { scope: "/" + REPO + "/" }).catch(() => null);
+}
+const unb64url = s => Uint8Array.from(atob(s.replace(/-/g, "+").replace(/_/g, "/")), c => c.charCodeAt(0));
+async function enablePush() {
+  if (!NAME) throw new Error("Choose whose phone this is first.");
+  if (await Notification.requestPermission() !== "granted") throw new Error("Notifications weren't allowed. Turn them on in Settings → Notifications.");
+  const reg = await swRegister() || await navigator.serviceWorker.ready;
+  await navigator.serviceWorker.ready;
+  const sub = (await reg.pushManager.getSubscription()) || await reg.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey: unb64url(VAPID_PUBLIC) });
+  const mine = sub.toJSON();
+  await updatePushFile(all => {
+    for (const p of Object.keys(all)) all[p] = (all[p] || []).filter(x => x.endpoint !== mine.endpoint); // a phone belongs to one person
+    all[NAME] = [...(all[NAME] || []), { endpoint: mine.endpoint, keys: mine.keys, at: new Date().toISOString() }].slice(-3);
+    return all;
+  });
+  store.set("push-on", NAME);
+}
+async function updatePushFile(change) {
+  for (let attempt = 0; attempt < 4; attempt++) {
+    const r = await fetch(API + PUSH_FILE + "?ref=" + BRANCH, { headers: headers(), cache: "no-store" });
+    let all = {}, sha;
+    if (r.ok) {
+      const j = await r.json(); sha = j.sha;
+      const data = JSON.parse(fromB64(j.content));
+      all = data.enc ? JSON.parse(await Vault.decryptText(CRYPTO_KEY, data.enc)) : data;
+    } else if (r.status !== 404) throw await ghError(r);
+    const text = JSON.stringify(change(all));
+    const body = VAULT && CRYPTO_KEY ? JSON.stringify({ v: 1, enc: await Vault.encryptText(CRYPTO_KEY, text) }) : text;
+    try { return await putFile(PUSH_FILE, toB64(body + "\n"), `${NAME} turned on notifications`, sha); }
+    catch (e) { if (e.status !== 409 && e.status !== 422) throw e; }
+  }
+  throw new Error("Couldn't save, try again.");
+}
+swRegister();
 
 /* ---------- "come and check" ping 🔔 ---------- */
 // A button on both pages: sends the other phone a notification that opens this page.

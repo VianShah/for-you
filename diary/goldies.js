@@ -26,6 +26,8 @@
     RACE_BETS: [0, 50, 150],            // what a puzzle race can be played for (winner takes it from the loser)
     // Goldies added by hand (not earned in the diary): { name: [{ at, pts, why }] }.
     BONUS: { Vian: [{ at: "2026-10-24T15:47:00Z", pts: 1180, why: "a bonus 🎉" }] }, // set so Vian was back at 290 (25 Oct)
+    // Scores set by hand: at that moment the score becomes `to`, and everything after counts from there.
+    SET_TO: { Vian: { at: "2026-10-28T05:40:00Z", to: 250 }, Jovena: { at: "2026-10-28T05:40:00Z", to: 250 } }, // both set to 250 (28 Oct)
     CALLER: 70, CALLER_FROM: "2026-10-24T15:47:00Z", // whoever starts a call from the diary gets 70 extra (calls from here on)
     WELCOME: 50,                       // a starting gift, so one quiet morning doesn't make Goldiee cry
     CRY_BELOW: 0,                       // Goldiee cries when a score drops below this
@@ -140,7 +142,7 @@
     return out.sort((a, b) => a.at - b.at);
   }
 
-  function score(entries, name, now = Date.now()) {
+  function rawScore(entries, name, now = Date.now()) {
     const ev = events(entries, name, now);
     const earned = ev.reduce((s, x) => s + x.pts, 0);
     // −50 for each full 3.5 awake hours between activities; any activity resets the clock.
@@ -158,7 +160,7 @@
     const spent = (entries || []).flatMap(e => [e.pin, ...(e.pinHistory || [])]).filter(p => p && p.by === name).length * RULES.PIN_COST
       + (entries || []).filter(e => e.type === "buy" && e.by === name && !e.cancelled).reduce((s, e) => s + (e.cost || 0), 0); // the shop
     // Puzzle race bets move goldies straight from the loser to the winner (sleep time or not).
-    const bets = races(entries).filter(r => r.bet && (r.winner === name || r.loser === name))
+    const bets = races(entries).filter(r => r.bet && r.at <= now && (r.winner === name || r.loser === name))
       .map(r => r.winner === name ? { at: r.at, pts: r.bet, why: "won a puzzle race 🧩" } : { at: r.at, pts: -r.bet, why: "lost a puzzle race 🧩" });
     const won = bets.reduce((s, x) => s + x.pts, 0);
     const sinceLast = quietMs(last, now) % (RULES.GAP_MIN * MIN);
@@ -174,6 +176,22 @@
       lastActive: ev.filter(x => !x.gift && !x.noClock).pop()?.at ?? null,
       history: [...ev, ...penalties, ...bets, ...shopHistory(entries, name)].sort((a, b) => b.at - a.at),
     };
+  }
+
+  // The diary as it was at moment t (pages, pins and purchases made later left out).
+  const asOf = (entries, t) => (entries || []).filter(e => Date.parse(e.at) <= t).map(e => e.pin || e.pinHistory
+    ? { ...e, pin: e.pin && Date.parse(e.pin.at) <= t ? e.pin : null, pinHistory: (e.pinHistory || []).filter(p => Date.parse(p.at) <= t) } : e);
+  // The score, with any SET_TO applied: the score at that moment is moved to `to`.
+  const baseCache = new WeakMap();
+  function score(entries, name, now = Date.now()) {
+    const s = rawScore(entries, name, now), set = RULES.SET_TO[name];
+    if (!set || now < Date.parse(set.at)) return s;
+    const key = entries || [], memo = baseCache.get(key) || {};
+    if (!(name in memo)) { memo[name] = rawScore(asOf(entries, Date.parse(set.at)), name, Date.parse(set.at)).points; baseCache.set(key, memo); }
+    const adj = set.to - memo[name];
+    const points = s.points + adj;
+    return { ...s, earned: s.earned + adj, points, crying: points < RULES.CRY_BELOW,
+      history: [...s.history, { at: Date.parse(set.at), pts: adj, why: `score set to ${set.to}`, gift: true }].sort((a, b) => b.at - a.at) };
   }
 
   // When a dare has to be done by (dares bought with a time limit, `hours`), or null.

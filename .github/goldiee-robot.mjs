@@ -3,6 +3,7 @@
 // and the OTHER person gets a ping through ntfy. Uses the same rules as the site
 // (diary/goldies.js). When the diary is encrypted it needs the VAULT_KEY secret.
 import fs from "node:fs";
+import { notifyPerson, loadContacts } from "./notify.mjs";
 
 const PEOPLE = ["Vian", "Jovena"];
 const read = p => fs.readFileSync(new URL("../" + p, import.meta.url), "utf8");
@@ -36,13 +37,8 @@ const now = process.env.NOW ? Date.parse(process.env.NOW) : Date.now();
 const DRY = !!process.env.DRY;
 // TEST=1 (the "test" box when running the workflow by hand) sends both phones a test notification.
 if (process.env.TEST === "true" || process.env.TEST === "1") {
-  const { topics } = await load();
-  for (const name of PEOPLE) {
-    if (!topics[name]) continue;
-    const res = await fetch("https://ntfy.sh/", { method: "POST", body: JSON.stringify({
-      topic: topics[name], title: "🔔 Test from the diary", message: `Hi ${name}! If you can read this, notifications work 💌`, tags: ["love_letter"] }) });
-    console.log(`test sent to ${name}: ${res.status}`);
-  }
+  const contacts = await loadContacts();
+  for (const name of PEOPLE) await notifyPerson(name, { title: "🔔 Test from the diary", message: `Hi ${name}! If you can read this, notifications work 💌` }, contacts);
   process.exit(0);
 }
 if (!Goldies.isAwake(now)) { console.log("Night time: Goldiee is asleep too."); process.exit(0); }
@@ -52,18 +48,12 @@ for (const name of PEOPLE) {
   console.log(`${name}: ${s.points} goldies${s.crying ? " (crying)" : ""}`);
   if (!s.crying) continue;
   const other = PEOPLE.find(p => p !== name);
-  const topic = topics[other];
-  if (!topic) continue;
+  if (!topics[other]) continue;
   const quiet = s.lastActive ? Math.round((now - s.lastActive) / 3600000) : null;
   if (DRY) { console.log(`  would ping ${other}: ${name} is at ${s.points} goldies`); continue; }
-  const res = await fetch("https://ntfy.sh/", {
-    method: "POST",
-    body: JSON.stringify({
-      topic,
-      title: "😢 Goldiee is crying",
-      message: `${name} is at ${s.points} goldies${quiet ? ` and hasn't written in ${quiet} h` : ""}. Send them a little nudge?`,
-      tags: ["cry"], // no link: it would open a fresh browser that asks for the secret word
-    }),
+  await notifyPerson(other, {
+    title: "😢 Goldiee is crying",
+    message: `${name} is at ${s.points} goldies${quiet ? ` and hasn't written in ${quiet} h` : ""}. Send them a little nudge?`,
+    tag: "crying",
   });
-  console.log(`  pinged ${other}: ${res.status}`);
 }

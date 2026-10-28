@@ -362,10 +362,24 @@ whoChoices.addEventListener("click", e => {
   syncNotifyBlock();
 });
 function syncNotifyBlock() {
-  const topic = NOTIFY_TOPICS[pickedWho];
-  $("#notifyBlock").hidden = !topic;
-  if (topic) $("#notifyTopic").textContent = topic;
+  const st = pushState(), btn = $("#pushBtn"), help = $("#pushHelp");
+  btn.hidden = st !== "off";
+  help.innerHTML = {
+    on: "✓ This phone gets a notification when the other one writes, replies or plays. Tapping it opens the diary.",
+    off: "Get a notification when the other one writes, replies or plays. Tapping it opens the diary right here.",
+    blocked: "Notifications are turned off for the diary. Turn them on in the iPhone's Settings → Notifications → Us ♥.",
+    homescreen: "On iPhone, notifications only work from the home-screen app:<br>1. Tap the <b>Share</b> button (the square with the arrow) at the bottom of Safari<br>2. Tap <b>Add to Home Screen</b>, then <b>Add</b><br>3. Open <b>Us ♥</b> from your home screen, come back to ⚙ and tap <b>turn on notifications</b>",
+    no: "This browser can't show notifications.",
+  }[st];
 }
+$("#pushBtn").addEventListener("click", async () => {
+  if (pickedWho && pickedWho !== NAME) { NAME = pickedWho; store.set("diary-name", NAME); }
+  const st = $("#settingsStatus");
+  setStatus(st, "Turning on notifications…");
+  try { await enablePush(); setStatus(st, "🔔 Notifications are on for this phone"); }
+  catch (err) { setStatus(st, err.message || "That didn't work, try again.", true); }
+  syncNotifyBlock();
+});
 
 function openSettings(msg = "", err = false) {
   pickedWho = NAME;
@@ -409,10 +423,6 @@ $("#copyLinkBtn").addEventListener("click", async () => {
   const link = `${location.origin}${location.pathname}#pair=${encodeURIComponent(KEY)}`;
   try { await navigator.clipboard.writeText(link); setStatus($("#settingsStatus"), "Copied. Send it to the other phone (it's the key, so only to them)."); }
   catch { prompt("Copy this setup link:", link); }
-});
-$("#copyTopicBtn").addEventListener("click", async () => {
-  try { await navigator.clipboard.writeText($("#notifyTopic").textContent); toast("Copied. Paste it into the ntfy app"); }
-  catch { prompt("Copy this:", $("#notifyTopic").textContent); }
 });
 $("#forgetBtn").addEventListener("click", () => {
   if (VAULT) {

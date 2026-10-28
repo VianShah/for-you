@@ -1,0 +1,27 @@
+name: Notify
+# A phone asks for this (POST /dispatches, event "notify") to send the other one a notification.
+on:
+  repository_dispatch:
+    types: [notify]
+
+permissions:
+  contents: read
+
+jobs:
+  send:
+    runs-on: ubuntu-latest
+    timeout-minutes: 2
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          sparse-checkout: |
+            .github
+            diary/vault.js
+            diary/vault.json
+            diary/push.json
+          sparse-checkout-cone-mode: false
+      - run: node .github/notify.mjs
+        env:
+          VAULT_KEY: ${{ secrets.VAULT_KEY }}
+          VAPID_PRIVATE: ${{ secrets.VAPID_PRIVATE }}
+          PAYLOAD: ${{ toJSON(github.event.client_payload) }}
