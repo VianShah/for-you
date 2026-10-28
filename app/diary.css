@@ -881,3 +881,7 @@ body[data-day-theme="photo"]::before { background: linear-gradient(rgba(251,245,
 .demo-bar button { font: inherit; font-size: 13px; padding: 6px 12px; border-radius: 999px; border: 1px solid rgba(255,255,255,.5); background: transparent; color: #fff; cursor: pointer; }
 .demo-bar button[data-gate="start"] { background: #fbf5ef; color: #6e2337; border-color: #fbf5ef; }
 :root[data-theme="dark"] .demo-bar { background: rgba(163,58,85,.92); }
+
+/* settings: the one button that can't be undone */
+.choice.danger { color: #b3263e; border-color: rgba(179,38,62,.35); }
+:root[data-theme="dark"] .choice.danger { color: #ff9aa8; border-color: rgba(255,154,168,.35); }

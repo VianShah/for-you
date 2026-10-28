@@ -97,14 +97,14 @@ async function initVault() {
   if (!s) { showDemoBar(); return "demo"; }
   CRYPTO_KEY = s.key; VAULT = { couple: true }; KEY = "couple";
   let settings = s.settings || {};
-  try { settings = await Couple.loadSettings(); } catch {}
+  try { settings = await Couple.loadSettings(); }
+  catch (e) { if (e.status === 401) { Couple.forget(); location.reload(); return new Promise(() => {}); } } // the diary was deleted
   NOTIFY_TOPICS = settings.topics || {};
   PHONES = settings.phones || {};
   // Scores set by hand for this couple only (kept on the server against their diary, never shared).
   let byHand = {};
   try { byHand = (await Couple.call("rules")).rules || {}; } catch {}
   applyCoupleRules({ ...settings, rules: { ...settings.rules, ...byHand } });
-  if (!settings.lovePage) $$("a.back").forEach(a => { a.hidden = true; }); // the love page is the first couple's own
   // Names changed since this phone last looked (e.g. just joined): start over with the right ones.
   if (settings.people?.length === 2 && settings.people.join("|") !== PEOPLE.join("|")) { location.reload(); return new Promise(() => {}); }
   return "unlocked";

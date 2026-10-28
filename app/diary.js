@@ -411,9 +411,31 @@ $("#shareCodeBtn").addEventListener("click", async () => {
   try { if (navigator.share) await navigator.share({ text }); else { await navigator.clipboard.writeText(text); setStatus($("#settingsStatus"), `Copied. Paste it to ${them} ♥`); } }
   catch { /* closed the share sheet */ }
 });
-$("#forgetBtn").addEventListener("click", () => {
-  if (!confirm("Lock this phone? You'll need your code to come back in.")) return;
+$("#editPageBtn").addEventListener("click", () => { location.href = "love.html#edit"; });
+// Out of the diary on this phone: no more notifications here, and the code is forgotten.
+async function leaveThisPhone() {
+  try {
+    const reg = await navigator.serviceWorker?.getRegistration();
+    const sub = await reg?.pushManager.getSubscription();
+    if (sub) await Couple.call("unsubscribe", { endpoint: sub.endpoint });
+  } catch { /* logging out works anyway */ }
   Couple.forget();
+  store.set("diary-name", ""); store.set("push-on", "");
+}
+$("#logoutBtn").addEventListener("click", async () => {
+  if (!confirm("Log out of this phone? You'll need your code to come back in.")) return;
+  await leaveThisPhone();
+  location.reload();
+});
+$("#deleteBtn").addEventListener("click", async () => {
+  const typed = prompt("This deletes your diary for both of you: every page, picture and voice note, and your page. It can't be undone. Type DELETE to delete it.");
+  if ((typed || "").trim().toUpperCase() !== "DELETE") return;
+  const st = $("#settingsStatus");
+  setStatus(st, "Deleting…");
+  try { await Couple.call("delete"); }
+  catch (err) { return setStatus(st, err.message || "That didn't work, try again.", true); }
+  Couple.forget();
+  store.set("diary-name", ""); store.set("push-on", "");
   location.reload();
 });
 

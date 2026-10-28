@@ -26,6 +26,20 @@ async function getVapid() {
   const m = Object.fromEntries((data || []).map(r => [r.key, r.value]));
   return (vapid = { pub: m.vapid_public, priv: m.vapid_private });
 }
+// Every file under a folder of the couple's storage (folders come back with no id).
+async function listAll(prefix: string): Promise<string[]> {
+  const out: string[] = [];
+  for (let offset = 0; ; offset += 1000) {
+    const { data, error } = await db.storage.from(BUCKET).list(prefix, { limit: 1000, offset });
+    if (error || !data?.length) break;
+    for (const f of data) {
+      if (f.id === null) out.push(...await listAll(`${prefix}/${f.name}`));
+      else out.push(`${prefix}/${f.name}`);
+    }
+    if (data.length < 1000) break;
+  }
+  return out;
+}
 export async function pushTo(couple: string, person: string, payload: Record<string, unknown>) {
   const { data: subs } = await db.from("push_subs").select("*").eq("couple_id", couple).eq("person", person);
   let delivered = 0;
@@ -99,6 +113,16 @@ Deno.serve(async req => {
     case "subscribe": { // { person, endpoint, keys: { p256dh, auth } }
       if (typeof b.endpoint !== "string" || !/^https:\/\//.test(b.endpoint) || !b.keys?.p256dh || !b.keys?.auth) return json({ error: "bad subscription" }, 400);
       const { error } = await db.from("push_subs").upsert({ endpoint: b.endpoint, couple_id: cid, person: clip(b.person, 60), p256dh: b.keys.p256dh, auth: b.keys.auth });
+      return error ? json({ error: error.message }, 500) : json({ ok: true });
+    }
+    case "unsubscribe": { // { endpoint }: this phone logged out, so it stops getting notifications
+      if (typeof b.endpoint === "string") await db.from("push_subs").delete().eq("endpoint", b.endpoint).eq("couple_id", cid);
+      return json({ ok: true });
+    }
+    case "delete": { // the whole diary, for both of them: every file, then the couple (pages, phones and alerts go with it)
+      const files = await listAll(cid);
+      for (let i = 0; i < files.length; i += 100) await db.storage.from(BUCKET).remove(files.slice(i, i + 100));
+      const { error } = await db.from("couples").delete().eq("id", cid);
       return error ? json({ error: error.message }, 500) : json({ ok: true });
     }
     case "notify": { // { to, title, body, url, tag } → { delivered }
