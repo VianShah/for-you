@@ -523,7 +523,6 @@ textarea.field.hand { font-family: var(--hand); font-size: 24px; line-height: 1.
 :root[data-theme="dark"] .call-widget { border-color: rgba(255,255,255,.07); }
 :root[data-theme="dark"] .cw-btn { background: rgba(255,255,255,.06); border-color: rgba(255,255,255,.12); color: #f2a7b1; box-shadow: none; }
 
-  padding: 8px 14px; border-radius: 18px; background: rgba(255,250,243,.85); border: 1px solid var(--line); box-shadow: 0 8px 20px -14px rgba(110,35,55,.45); }
 .goldie-rules .rules, .goldie-rules .history { list-style: none; display: grid; gap: 6px; margin: 4px 0 14px; font-size: 14px; }
 .goldie-rules .rules b, .goldie-rules .history b { display: inline-block; min-width: 46px; color: #a8741a; font-weight: 500; }
 .goldie-rules b.minus { color: #b3263e; }
@@ -874,3 +873,7 @@ body[data-day-theme="photo"]::before { background: linear-gradient(rgba(251,245,
 .gal-track figure { aspect-ratio: 4 / 5; background: #1a1214; }
 .gal-track img { height: 100%; object-fit: cover; }
 .post-card .gal-track img { object-fit: contain; }
+
+/* calls: today / this week / last week */
+.goldie-rules .call-totals { grid-template-columns: repeat(3, 1fr); text-align: center; }
+.goldie-rules .call-totals b { display: block; min-width: 0; font-size: 18px; }

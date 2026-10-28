@@ -20,13 +20,15 @@ function fmtCallTime(secs) {
 function dayStart(t = Date.now()) { const d = new Date(t); d.setHours(0, 0, 0, 0); return d.getTime(); }
 function weekStart(t = Date.now()) { const d = new Date(dayStart(t)); d.setDate(d.getDate() - (d.getDay() + 6) % 7); return d.getTime(); }
 const fmtClock = ms => { const s = Math.max(0, Math.floor(ms / 1000)); return `${Math.floor(s / 3600)}:${String(Math.floor(s / 60) % 60).padStart(2, "0")}:${String(s % 60).padStart(2, "0")}`; };
+const lastWeekStart = (t = Date.now()) => { const d = new Date(weekStart(t)); d.setDate(d.getDate() - 7); return d.getTime(); };
+// Seconds on calls between two moments (from <= start < to).
+const callSecs = (calls, from, to = Infinity) => calls.filter(c => { const t = Date.parse(c.at); return t >= from && t < to; }).reduce((s, c) => s + (c.duration || 0), 0);
 const pendingCall = () => { try { return JSON.parse(store.get("call-pending") || "null"); } catch { return null; } };
 
 function renderCallWidget() {
   const el = $("#callWidget"); if (!el) return;
   if (!NAME) { el.hidden = true; return; }
   const calls = entries.filter(isCall);
-  const since = t => calls.filter(c => Date.parse(c.at) >= t).reduce((s, c) => s + (c.duration || 0), 0);
   const icon = d => `<svg viewBox="0 0 24 24" aria-hidden="true"><path d="${d}" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg>`;
   const VIDEO = "M3.5 7.5A1.5 1.5 0 0 1 5 6h8.5A1.5 1.5 0 0 1 15 7.5v9a1.5 1.5 0 0 1-1.5 1.5H5a1.5 1.5 0 0 1-1.5-1.5zM15 10.5l5.5-3v9l-5.5-3";
   const BELL = "M6 16.5V11a6 6 0 0 1 12 0v5.5l1.5 2h-15zM10 20.5a2 2 0 0 0 4 0";
@@ -35,7 +37,7 @@ function renderCallWidget() {
   // On a call right now: a live clock and a button to say you've hung up.
   const stats = live
     ? `<button type="button" class="cw-stats live" data-call-end><span class="cw-num cw-live" data-call-since="${live.start}">${fmtClock(Date.now() - live.start)}</span><span class="cw-lbl">on a call with ${esc(partnerOf(NAME))} · tap when you hang up ✓</span></button>`
-    : `<button type="button" class="cw-stats" data-calls><span class="cw-num">${fmtCallTime(since(dayStart()))}</span><span class="cw-lbl">on calls today · ${fmtCallTime(since(weekStart()))} this week</span></button>`;
+    : `<button type="button" class="cw-stats" data-calls><span class="cw-num">${fmtCallTime(callSecs(calls, dayStart()))}</span><span class="cw-lbl">on calls today · ${fmtCallTime(callSecs(calls, weekStart()))} this week · ${fmtCallTime(callSecs(calls, lastWeekStart(), weekStart()))} last week</span></button>`;
   el.innerHTML = `${stats}
     <div class="cw-btns"><button type="button" class="cw-btn" data-call="video" aria-label="FaceTime ${esc(partnerOf(NAME))}" title="FaceTime ${esc(partnerOf(NAME))}">${icon(VIDEO)}</button><button type="button" class="cw-btn" data-call="audio" aria-label="FaceTime audio" title="FaceTime audio">${icon(PHONE)}</button><button type="button" class="cw-btn" data-ping aria-label="Ping ${esc(partnerOf(NAME))} to come and check" title="Ping ${esc(partnerOf(NAME))} to come and check">${icon(BELL)}</button></div>`;
   el.hidden = false;
@@ -117,7 +119,9 @@ function openCallList() {
   const back = document.createElement("div");
   back.className = "sheet-back";
   back.innerHTML = `<div class="sheet small goldie-rules"><div class="sheet-head"><h2>Our calls</h2><button type="button" class="icon-btn close" data-close>✕</button></div>
-    <p class="help">Calls started from the diary are timed from tapping the button until you tell the diary you've hung up. Calls made straight from the FaceTime app aren't counted. Every 15 minutes together is +5 goldies for both of you.</p>
+    <ul class="rules call-totals"><li><b>${fmtCallTime(callSecs(calls, dayStart()))}</b> today</li><li><b>${fmtCallTime(callSecs(calls, weekStart()))}</b> this week</li>
+      <li><b>${fmtCallTime(callSecs(calls, lastWeekStart(), weekStart()))}</b> last week</li></ul>
+    <p class="help">Calls started from the diary are timed from tapping the button until you tell the diary you've hung up. Apple doesn't let websites see calls made straight from the FaceTime app, so start your calls from here to count them. Every 15 minutes together is +5 goldies for both of you.</p>
     <ul class="history">${calls.slice(0, 25).map(c => `<li><b>${fmtCallTime(c.duration)}</b> ${c.kind === "audio" ? "📞" : "🎥"} ${esc(c.by)} called <small>${when(c.at)}</small></li>`).join("") || "<li>no calls yet, so tap 🎥 to start one ♥</li>"}</ul></div>`;
   back.addEventListener("click", e => { if (e.target === back || e.target.closest("[data-close]")) back.remove(); });
   document.body.appendChild(back);
