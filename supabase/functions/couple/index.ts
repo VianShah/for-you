@@ -18,6 +18,8 @@ const ID = /^[a-f0-9]{32}$/;
 const okPath = (p: unknown) => typeof p === "string" && /^[\w][\w./-]{0,200}$/.test(p) && !p.includes("..");
 const okMedia = (p: unknown) => okPath(p) && (p as string).startsWith("diary/");
 const clip = (s: unknown, n: number) => String(s ?? "").slice(0, n);
+const SITE = "https://vianshah.github.io/for-you/";
+const INVITER = "vianshah"; // the GitHub account whose diary key may make invite links
 
 let vapid: { pub: string; priv: string } | null = null;
 async function getVapid() {
@@ -73,6 +75,19 @@ Deno.serve(async req => {
     await db.from("invites").update({ couple_id: b.cid }).eq("token", token);
     await db.from("docs").insert({ couple_id: b.cid, path: "meta", body: b.meta });
     return json({ ok: true });
+  }
+
+  // A new invite link, made from Vian & Jovena's own diary: only their GitHub key (unlocked on their phones by
+  // their secret word) can make one. The key is used once to ask GitHub whose it is, and never kept.
+  if (b.action === "invite") {
+    if (typeof b.gh !== "string" || b.gh.length < 20 || b.gh.length > 300) return json({ error: "Only Vian & Jovena's diary can invite a couple." }, 403);
+    const who = await fetch("https://api.github.com/user", { headers: { Authorization: `Bearer ${b.gh}`, Accept: "application/vnd.github+json", "User-Agent": "for-you-couples" } })
+      .then(r => r.ok ? r.json() : null).catch(() => null);
+    if (String(who?.login || "").toLowerCase() !== INVITER) return json({ error: "Only Vian & Jovena's diary can invite a couple." }, 403);
+    const label = clip(b.label, 80).trim() || "a new couple";
+    const token = [...crypto.getRandomValues(new Uint8Array(12))].map(x => x.toString(16).padStart(2, "0")).join("");
+    const { error } = await db.from("invites").insert({ token, label });
+    return error ? json({ error: error.message }, 500) : json({ link: `${SITE}app/#invite=${token}`, label });
   }
 
   // Everything else needs the couple's secret.

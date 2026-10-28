@@ -391,6 +391,8 @@ function openSettings(msg = "", err = false) {
   $("#vaultSetupBlock").hidden = on || !KEY;
   $("#vaultOnBlock").hidden = !on;
   $("#forgetBtn").hidden = !on && !KEY;
+  $("#inviteBlock").hidden = !KEY; // only a phone that's in our diary can invite a couple
+  $("#inviteResult").hidden = true;
   syncNotifyBlock();
   $("#ftLabel").textContent = `${partnerOf(NAME || PEOPLE[0])}'s FaceTime`;
   $("#ftInput").value = store.get("facetime-to") || PHONES[partnerOf(NAME || PEOPLE[0])] || "";
@@ -398,6 +400,33 @@ function openSettings(msg = "", err = false) {
   openSheet("#settingsBack");
 }
 $("#settingsBtn").addEventListener("click", () => openSettings());
+
+/* ---------- inviting another couple to the couples app (app/, its own server) ---------- */
+// The server checks our diary key belongs to our GitHub account, so only our phones can make these.
+const COUPLES_FN = "https://egvoajakldcsdyhbprxg.supabase.co/functions/v1/couple";
+const COUPLES_KEY = "sb_publishable_77nVBUH5IkF7YmqLrckWlw_C0uorJkg"; // public by design
+$("#inviteBtn").addEventListener("click", async () => {
+  const st = $("#settingsStatus"), who = $("#inviteLabel").value.trim(), btn = $("#inviteBtn");
+  if (!who) return setStatus(st, "Type who the invite is for.", true);
+  btn.disabled = true; setStatus(st, "Making the link…");
+  try {
+    const r = await fetch(COUPLES_FN, { method: "POST", headers: { "Content-Type": "application/json", apikey: COUPLES_KEY },
+      body: JSON.stringify({ action: "invite", gh: KEY, label: `${who} (invited by ${NAME || "us"})` }) });
+    const j = await r.json().catch(() => ({}));
+    if (!r.ok) throw new Error(j.error || `The couples server said ${r.status}`);
+    $("#inviteLink").textContent = j.link;
+    $("#inviteResult").hidden = false;
+    $("#inviteLabel").value = "";
+    setStatus(st, `Invite for ${who} is ready ♥ Tap "send it".`);
+  } catch (e) { setStatus(st, e.message || "That didn't work, try again.", true); }
+  btn.disabled = false;
+});
+$("#inviteShareBtn").addEventListener("click", async () => {
+  const link = $("#inviteLink").textContent;
+  const text = `Here's your own little diary for two 💌 Open this to start it (the link works once): ${link}`;
+  try { if (navigator.share) await navigator.share({ text }); else { await navigator.clipboard.writeText(text); setStatus($("#settingsStatus"), "Copied. Paste it to them ♥"); } }
+  catch { /* closed the share sheet */ }
+});
 $("#settings").addEventListener("submit", async e => {
   e.preventDefault();
   const st = $("#settingsStatus");
