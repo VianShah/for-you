@@ -13,9 +13,8 @@ alter table invites enable row level security;
 alter table couples add column if not exists label text;
 alter table couples add column if not exists rules jsonb not null default '{}'::jsonb;
 
--- The phones fetch this key to switch notifications on (public by design). The private half is added by hand.
-insert into config (key, value) values ('vapid_public', 'BAtscJGZ_lyQig8866R2cuR_-rotxNMLBw9GgsimXVw9IxlsPV4yqLRpI803yI0iyF17qMhYEWMvL4k4nQLu5qU')
-on conflict (key) do nothing;
+-- Notifications: this project has its own VAPID key pair (not the GitHub diary's), generated at setup and
+-- added by hand as config rows vapid_public (base64url, 65-byte point) and vapid_private (base64url d).
 -- Only the scheduler knows this, so nobody else can set off the tick function.
 insert into config (key, value) values ('tick_secret', encode(extensions.gen_random_bytes(24), 'hex'))
 on conflict (key) do nothing;
