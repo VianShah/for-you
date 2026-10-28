@@ -1,0 +1,82 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="apple-touch-icon" href="../apple-touch-icon.png">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="Us ♥">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<title>Our Shop</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Caveat:wght@400;600&family=Cormorant+Garamond:ital,wght@0,400;0,500;1,400&family=Pinyon+Script&family=Jost:wght@300;400;500&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="diary.css?v=2026102810">
+<script src="theme.js?v=2026102810"></script>
+</head>
+<body class="games shop">
+
+<div class="cursor" id="cursor"><svg viewBox="0 0 24 24"><path fill="currentColor" d="M12 21s-7.5-4.6-9.6-9.2C.9 8.4 3 4.5 6.7 4.5c2.1 0 3.6 1.2 4.3 2.4h2c.7-1.2 2.2-2.4 4.3-2.4 3.7 0 5.8 3.9 4.3 7.3C19.5 16.4 12 21 12 21z"/></svg></div>
+
+<header class="top">
+  <a class="back" href="../">← back to the start</a>
+  <button class="icon-btn theme-btn" data-theme-toggle aria-label="Switch theme">🌙</button>
+  <div class="title-wrap">
+    <div class="eyebrow">spend · spoil · surprise</div>
+    <h1>Our shop</h1>
+    <p class="sub">what your goldies can buy</p>
+  </div>
+  <nav class="sections">
+    <a class="section" href="./">📖 our diary</a>
+    <a class="section" href="games.html">🎲 mini games</a>
+    <a class="section on" href="shop.html">🛍 our shop</a>
+  </nav>
+  <div class="glass-dock">
+    <button type="button" class="goldie-bar" id="goldieBar" hidden aria-label="Goldie points"></button>
+  </div>
+</header>
+
+<main class="games-main">
+
+  <!-- GOLDIEE'S WARDROBE -->
+  <section class="game wardrobe" id="wardrobe">
+    <div class="game-head"><span class="game-icon">🐶</span><div><h2>Goldiee's wardrobe</h2><p>Tap a look to try it on her. Buy it once, and either of you can dress her in it any time.</p></div></div>
+    <div class="wardrobe-stage" id="wardrobeStage"></div>
+    <div class="shop-grid" id="outfits"></div>
+  </section>
+
+  <!-- DARES -->
+  <section class="game" id="coupons">
+    <div class="game-head"><span class="game-icon">😈</span><div><h2>Dares</h2><p id="couponIntro"></p></div></div>
+    <div class="kw-list" id="couponTodo"></div>
+    <div id="couponShop"></div>
+  </section>
+
+  <!-- DIARY BACKDROP -->
+  <section class="game" id="backdrop">
+    <div class="game-head"><span class="game-icon">🎨</span><div><h2>Backdrop for today</h2><p>Change the diary's background on both phones for the rest of the day: a ready-made one, or one of your own pictures.</p></div></div>
+    <p class="hint" id="themeNow"></p>
+    <div class="shop-grid" id="themes"></div>
+  </section>
+
+  <!-- LITTLE EXTRAS -->
+  <section class="game" id="extras">
+    <div class="game-head"><span class="game-icon">✨</span><div><h2>Little extras</h2><p>Small things, big smiles.</p></div></div>
+    <div class="shop-extras" id="extrasList"></div>
+  </section>
+
+</main>
+
+<script src="vault.js?v=2026102810"></script>
+<script src="couple.js?v=2026102810"></script>
+<script src="demo.js?v=2026102810"></script>
+<script src="goldies.js?v=2026102810"></script>
+<script src="core.js?v=2026102810"></script>
+<script src="shop-items.js?v=2026102810"></script>
+<script src="questions.js?v=2026102810"></script>
+<script src="goldiee.js?v=2026102810"></script>
+<script src="shop.js?v=2026102810"></script>
+</body>
+</html>
