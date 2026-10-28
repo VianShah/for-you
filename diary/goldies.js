@@ -143,7 +143,7 @@
   }
 
   function rawScore(entries, name, now = Date.now()) {
-    const ev = events(entries, name, now);
+    const ev = events(entries, name, now).filter(x => x.at <= now); // nothing from after "now" (replies to older pages included)
     const earned = ev.reduce((s, x) => s + x.pts, 0);
     // −50 for each full 3.5 awake hours between activities; any activity resets the clock.
     // A quiet-day shield from the shop pauses the clock, like sleep time, while it lasts.
@@ -179,8 +179,9 @@
   }
 
   // The diary as it was at moment t (pages, pins and purchases made later left out).
-  const asOf = (entries, t) => (entries || []).filter(e => Date.parse(e.at) <= t).map(e => e.pin || e.pinHistory
-    ? { ...e, pin: e.pin && Date.parse(e.pin.at) <= t ? e.pin : null, pinHistory: (e.pinHistory || []).filter(p => Date.parse(p.at) <= t) } : e);
+  const asOf = (entries, t) => (entries || []).filter(e => Date.parse(e.at) <= t).map(e => ({ ...e,
+    ...(e.pin || e.pinHistory ? { pin: e.pin && Date.parse(e.pin.at) <= t ? e.pin : null, pinHistory: (e.pinHistory || []).filter(p => Date.parse(p.at) <= t) } : {}),
+    ...(e.replies ? { replies: e.replies.filter(r => Date.parse(r.at) <= t) } : {}) }));
   // The score, with any SET_TO applied: the score at that moment is moved to `to`.
   const baseCache = new WeakMap();
   function score(entries, name, now = Date.now()) {
