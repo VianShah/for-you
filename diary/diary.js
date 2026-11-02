@@ -202,10 +202,13 @@ function showSurprise() {
   if (!NAME || $(".surprise-pop")) return;
   const seen = store.get("surprises-seen").split(",");
   // Surprises and flowers both pop up once, the first time this phone opens the diary after.
-  const s = [...surprisesFor(entries, NAME), ...flowersFor(entries, NAME)].sort((a, b) => Date.parse(a.at) - Date.parse(b.at)).find(e => !seen.includes(e.id));
+  // Goldies given by hand (Goldies.RULES.BONUS entries with `reveal`) pop up too, with flower confetti.
+  const gifts = (window.Goldies?.RULES.BONUS[NAME] || []).filter(b => b.reveal && Date.parse(b.at) <= Date.now()).map(b => ({ ...b, item: "bonus", by: "Goldiee" }));
+  const s = [...surprisesFor(entries, NAME), ...flowersFor(entries, NAME), ...gifts].sort((a, b) => Date.parse(a.at) - Date.parse(b.at)).find(e => !seen.includes(e.id));
   if (!s) return;
   store.set("surprises-seen", [s.id, ...seen.filter(Boolean)].slice(0, 100).join(","));
   if (s.item === "flowers") return flowerReveal(s);
+  if (s.item === "bonus") return giftReveal(s);
   const back = document.createElement("div");
   back.className = "sheet-back surprise-pop";
   back.innerHTML = `<div class="sheet small surprise-card"><div class="surprise-look">${window.goldiee?.look ? goldiee.look(currentOutfit(entries)) : "🐶"}</div>

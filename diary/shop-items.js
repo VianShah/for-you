@@ -184,6 +184,29 @@ const flowersFor = (list, name) => buys(list, "flowers").filter(e => e.for === n
 
 // Receiving flowers: a full-screen moment. Petals rain down, the paper rises, each flower
 // flies into the place the sender chose, the ribbon ties, and their card slides in.
+// Goldies handed over by hand: a shower of flowers, a spinning coin and a note, once per phone.
+function giftReveal(g, forName = NAME) {
+  if (!g || document.querySelector(".bloom")) return;
+  const kinds = Object.keys(SHOP.FLOWERS);
+  const petals = Array.from({ length: 46 }, (_, i) => {
+    const k = kinds[i % kinds.length];
+    return `<i class="petal" style="left:${(rand(g.id, i) * 100).toFixed(1)}%;--d:${(rand(g.id, i + 50) * 2).toFixed(2)}s;--t:${(2.6 + rand(g.id, i + 99) * 2).toFixed(2)}s;--s:${(.55 + rand(g.id, i + 7) * .8).toFixed(2)};--x:${Math.round((rand(g.id, i + 3) - .5) * 140)}px"><svg viewBox="-16 -16 32 32">${flowerHead(k)}</svg></i>`;
+  }).join("");
+  const back = document.createElement("div");
+  back.className = "sheet-back bloom";
+  back.innerHTML = `<div class="petals">${petals}</div>
+    <div class="bloom-card">
+      <div class="bloom-title"><small>for you, ${esc(forName || "")}</small><b>a gift from ${esc(g.by)}</b></div>
+      <div class="gift-coin" aria-hidden="true"><span>+${esc(g.pts)}</span><small>goldies</small></div>
+      ${g.note ? `<p class="bloom-note" style="--nd:1.2s">“${esc(g.note)}”</p>` : ""}
+      <button class="save bloom-btn" data-close style="--nd:1.8s">thank you 🪙</button>
+    </div>`;
+  back.addEventListener("click", ev => { if (ev.target.closest("[data-close]")) back.remove(); });
+  document.body.appendChild(back);
+  const pop = () => { const r = back.querySelector(".gift-coin")?.getBoundingClientRect(); if (r && window.burst) burst(r.left + r.width / 2, r.top + r.height / 2, 24); };
+  [600, 1300, 2000].forEach(t => setTimeout(pop, t));
+}
+
 function flowerReveal(f, forName = NAME) {
   if (!f || document.querySelector(".bloom")) return;
   const n = (f.layout?.length) || flowerCount(f.flowers);

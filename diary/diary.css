@@ -781,6 +781,13 @@ body[data-day-theme="photo"]::before { background: linear-gradient(rgba(251,245,
   box-shadow: 0 14px 30px -18px rgba(110,35,55,.5); transform: rotate(-1.5deg); animation: note-in .7s var(--nd) cubic-bezier(.2,.8,.2,1) both; }
 @keyframes note-in { from { transform: translateX(110%) rotate(8deg); opacity: 0; } to { transform: rotate(-1.5deg); opacity: 1; } }
 .bloom-btn { animation: up .5s var(--nd) both; }
+.gift-coin { width: 190px; height: 190px; border-radius: 50%; display: grid; place-content: center; text-align: center; margin: 6px 0;
+  background: radial-gradient(circle at 35% 30%, #fff2b0, #f6c445 55%, #d99a1b); box-shadow: inset 0 0 0 6px rgba(255,255,255,.35), 0 18px 40px -16px rgba(180,110,10,.7);
+  color: #6b3d00; animation: coin-in 1.1s .3s cubic-bezier(.2,.9,.25,1.2) both; }
+.gift-coin span { font-family: var(--script); font-size: 62px; line-height: 1; }
+.gift-coin small { font-size: 11px; letter-spacing: .3em; text-transform: uppercase; }
+@keyframes coin-in { from { transform: translateY(-120px) rotateY(720deg) scale(.2); opacity: 0; } 60% { opacity: 1; } to { transform: none; opacity: 1; } }
+@media (prefers-reduced-motion: reduce) { .gift-coin { animation: none; } }
 :root[data-theme="dark"] .bloom { background: radial-gradient(circle at 50% 40%, rgba(58,26,36,.97), rgba(22,16,19,.98)); }
 :root[data-theme="dark"] .bloom-title b { color: #f2a7b1; }
 :root[data-theme="dark"] .bloom-note { color: #3a2026; }

@@ -25,7 +25,10 @@
     PIN_COST: 100, PIN_DAYS: 3,         // a pinned picture stays on the love page for 3 days
     RACE_BETS: [0, 50, 150],            // what a puzzle race can be played for (winner takes it from the loser)
     // Goldies added by hand (not earned in the diary): { name: [{ at, pts, why }] }.
-    BONUS: { Vian: [{ at: "2026-10-24T15:47:00Z", pts: 1180, why: "a bonus 🎉" }] }, // set so Vian was back at 290 (25 Oct)
+    BONUS: { // goldies added by hand; `reveal` ones also pop up once, with flower confetti, the next time that person opens the diary
+      Vian: [{ at: "2026-10-24T15:47:00Z", pts: 1180, why: "a bonus 🎉" }, { id: "gift-20261102-1000", at: "2026-11-02T08:30:00Z", pts: 1000, why: "a gift from Goldiee 🌸", reveal: true, note: "A thousand little reasons to smile. You two are my favourite people 🐶💐" }], // the first set Vian back at 290 (25 Oct)
+      Jovena: [{ id: "gift-20261102-1000", at: "2026-11-02T08:30:00Z", pts: 1000, why: "a gift from Goldiee 🌸", reveal: true, note: "A thousand little reasons to smile. You two are my favourite people 🐶💐" }], // both got 1,000 (2 Nov)
+    },
     // Scores set by hand: at that moment the score becomes `to`, and everything after counts from there.
     SET_TO: { Vian: { at: "2026-10-28T05:40:00Z", to: 250 }, Jovena: { at: "2026-10-28T05:40:00Z", to: 250 } }, // both set to 250 (28 Oct)
     CALLER: 70, CALLER_FROM: "2026-10-24T15:47:00Z", // whoever starts a call from the diary gets 70 extra (calls from here on)
