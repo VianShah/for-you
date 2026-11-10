@@ -888,3 +888,14 @@ body[data-day-theme="photo"]::before { background: linear-gradient(rgba(251,245,
 /* calls: today / this week / last week */
 .goldie-rules .call-totals { grid-template-columns: repeat(3, 1fr); text-align: center; }
 .goldie-rules .call-totals b { display: block; min-width: 0; font-size: 18px; }
+
+/* gifts: a coin and petals */
+.gift-coin { width: 190px; height: 190px; border-radius: 50%; display: grid; place-content: center; text-align: center; margin: 6px 0;
+  background: radial-gradient(circle at 35% 30%, #fff2b0, #f6c445 55%, #d99a1b); box-shadow: inset 0 0 0 6px rgba(255,255,255,.35), 0 18px 40px -16px rgba(180,110,10,.7);
+  color: #6b3d00; animation: coin-in 1.1s .3s cubic-bezier(.2,.9,.25,1.2) both; }
+.gift-coin span { font-family: var(--script); font-size: 62px; line-height: 1; }
+.gift-coin small { font-size: 11px; letter-spacing: .3em; text-transform: uppercase; }
+@keyframes coin-in { from { transform: translateY(-120px) rotateY(720deg) scale(.2); opacity: 0; } 60% { opacity: 1; } to { transform: none; opacity: 1; } }
+@media (prefers-reduced-motion: reduce) { .gift-coin { animation: none; } }
+.surprise-pop { overflow: hidden; }
+.surprise-pop .sheet { position: relative; z-index: 1; }

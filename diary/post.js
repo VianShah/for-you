@@ -282,7 +282,7 @@ function showAttach() {
   box.hidden = !(reply.photo || reply.video || reply.voice);
 }
 function resetReply() {
-  Object.assign(reply, { photo: null, photoFile: null, mirror: false, video: null, vthumb: null, vshape: "", voice: null, voiceMime: "", duration: 0 });
+  Object.assign(reply, { draft: null, photo: null, photoFile: null, mirror: false, video: null, vthumb: null, vshape: "", voice: null, voiceMime: "", duration: 0 });
   $("#replyPhoto").value = "";
   $("#replyAttach").hidden = true; $("#replyAttach").innerHTML = "";
   setStatus($("#replyStatus"), "");
@@ -357,24 +357,31 @@ $("#replyForm").addEventListener("submit", async ev => {
   const st = $("#replyStatus"), btn = $("#replySend");
   btn.disabled = true;
   try {
-    const r = { id: newId(), by: NAME, at: nowIso() };
-    if (text) r.text = text;
     const blob = reply.photo || reply.video || reply.voice;
+    // Sending again after a failure reuses the same reply and what already went up.
+    if (!reply.draft || reply.draft.blob !== blob || reply.draft.page !== e.id) reply.draft = { rid: newId(), blob, page: e.id, up: {} };
+    const r = { id: reply.draft.rid, by: NAME, at: nowIso() };
+    if (text) r.text = text;
+    const up = async (path, data, message) => {
+      if (reply.draft.up[path]) return reply.draft.up[path];
+      const packed = await packMedia(path, data);
+      const res = await putFile(packed.path, packed.b64, message);
+      return (reply.draft.up[path] = { path: packed.path, sha: res.content.sha });
+    };
     if (blob) {
       r.kind = reply.photo ? "photo" : reply.video ? "video" : "voice";
       const ext = reply.photo ? "jpg" : reply.video ? videoExt(reply.video) : ({ "audio/mp4": "m4a", "audio/ogg": "ogg" }[reply.voiceMime] || "webm");
       setStatus(st, reply.video ? "Sending the video… (big ones take a minute)" : "Sending…");
-      const packed = await packMedia(`${MEDIA_DIR}${e.id}-r${r.id}.${ext}`, blob); // encrypted when the vault is on
-      const res = await putFile(packed.path, packed.b64, `A reply from ${NAME}`);
-      r.media = packed.path; r.mediaSha = res.content.sha;
+      const main = await up(`${MEDIA_DIR}${e.id}-r${r.id}.${ext}`, blob, `A reply from ${NAME}`); // encrypted when the vault is on
+      r.media = main.path; r.mediaSha = main.sha;
       if (reply.voice) r.duration = Math.round(reply.duration);
       if (reply.video) {
         r.shape = reply.vshape || "tall";
-        if (reply.vthumb) { const t = await packMedia(`${MEDIA_DIR}${e.id}-r${r.id}-thumb.jpg`, reply.vthumb); await putFile(t.path, t.b64, `Video thumbnail from ${NAME}`); r.thumb = t.path; }
+        if (reply.vthumb) r.thumb = (await up(`${MEDIA_DIR}${e.id}-r${r.id}-thumb.jpg`, reply.vthumb, `Video thumbnail from ${NAME}`)).path;
       }
     }
     const before = myPoints(entries);
-    entries = await updateIndex(list => list.map(x => x.id === e.id ? { ...x, replies: [...(x.replies || []), r] } : x), `A reply from ${NAME}`);
+    entries = await updateIndex(list => list.map(x => x.id === e.id && !(x.replies || []).some(q => q.id === r.id) ? { ...x, replies: [...(x.replies || []), r] } : x), `A reply from ${NAME}`);
     pointsToast(before, entries);
     window.goldiee?.cry(Goldies.score(entries, NAME).crying);
     const theirs = (e.by || e.author) !== NAME;
@@ -383,6 +390,6 @@ $("#replyForm").addEventListener("submit", async ev => {
     resetReply();
     render(); renderPost();
     const sheet = $(".post-sheet"); sheet.scrollTop = sheet.scrollHeight; // show the reply just sent
-  } catch (err) { setStatus(st, err.message, true); }
+  } catch (err) { setStatus(st, friendlyError(err), true); }
   finally { btn.disabled = false; }
 });

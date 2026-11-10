@@ -187,32 +187,73 @@ function startAutoRefresh(apply, first) {
   document.addEventListener("visibilitychange", () => { if (!document.hidden) setTimeout(check, 400); });
 }
 
-async function putFile(path, b64, message, sha) {
-  const body = { message, content: b64, branch: BRANCH };
-  if (sha) body.sha = sha;
+const sleep = ms => new Promise(r => setTimeout(r, ms));
+// A dropped connection (iPhone Safari calls it "Load failed", Chrome "Failed to fetch") is a TypeError with no
+// HTTP status. Those, and a busy GitHub, are worth another go.
+const dropped = e => e instanceof TypeError;
+const flaky = e => dropped(e) || e.status >= 500 || e.status === 429;
+
+// One try at writing a file; callers decide what a failure means.
+async function ghPut(path, body) {
   const r = await fetch(API + path, { method: "PUT", headers: headers(), body: JSON.stringify(body) });
   if (!r.ok) throw await ghError(r);
   return r.json();
 }
-
-async function deleteFile(path, sha, message) {
-  const r = await fetch(API + path, { method: "DELETE", headers: headers(), body: JSON.stringify({ message, sha, branch: BRANCH }) });
-  if (!r.ok) throw await ghError(r);
+// Writes a new file (or, given `sha`, a new version of one). Safe to repeat: when an earlier try got
+// through but its answer was lost, GitHub says the file already exists (422), and that counts as done.
+async function putFile(path, b64, message, sha) {
+  const body = { message, content: b64, branch: BRANCH };
+  if (sha) body.sha = sha;
+  for (let i = 0; ; i++) {
+    try { return await ghPut(path, body); }
+    catch (e) {
+      if (e.status === 422 && !sha && /sha/i.test(e.message)) return { content: { sha: "" }, existed: true };
+      if (i < 3 && (flaky(e) || e.status === 409)) { await sleep(600 * 2 ** i); continue; }
+      throw e;
+    }
+  }
 }
 
-// Read-modify-write the index, retrying if the other person saved at the same moment.
+async function deleteFile(path, sha, message) {
+  for (let i = 0; ; i++) {
+    try {
+      const r = await fetch(API + path, { method: "DELETE", headers: headers(), body: JSON.stringify({ message, sha, branch: BRANCH }) });
+      if (!r.ok) throw await ghError(r);
+      return;
+    } catch (e) { if (i < 3 && flaky(e)) { await sleep(600 * 2 ** i); continue; } throw e; }
+  }
+}
+
+// What to tell someone when a save fails: a dropped connection isn't their fault, and nothing is lost.
+function friendlyError(e) {
+  if (dropped(e) || /load failed|failed to fetch|network/i.test(e?.message || "")) return "The connection dropped on the way. Tap again to finish: anything already uploaded won't be sent twice.";
+  return e?.message || "That didn't work, try again.";
+}
+
+// Read-modify-write the index, retrying if the other person saved at the same moment or the connection dropped.
 async function updateIndex(change, message) {
-  for (let attempt = 0; attempt < 4; attempt++) {
-    const r = await fetch(API + INDEX + "?ref=" + BRANCH, { headers: headers(), cache: "no-store" });
+  let maybe = null; // what we last tried to save, if no answer ever came back
+  for (let attempt = 0; attempt < 6; attempt++) {
     let list = [], sha;
-    if (r.ok) { const j = await r.json(); list = await decodeIndex(JSON.parse(fromB64(j.content))); sha = j.sha; }
-    else if (r.status !== 404) throw await ghError(r);
+    try {
+      const r = await fetch(API + INDEX + "?ref=" + BRANCH, { headers: headers(), cache: "no-store" });
+      if (r.ok) { const j = await r.json(); list = await decodeIndex(JSON.parse(fromB64(j.content))); sha = j.sha; }
+      else if (r.status !== 404) throw await ghError(r);
+    } catch (e) {
+      if (flaky(e) && attempt < 5) { await sleep(500 * (attempt + 1)); continue; }
+      throw e;
+    }
+    // The last try may have gone through even though its answer was lost: then it's saved, so don't do it twice.
+    if (maybe && JSON.stringify(list) === JSON.stringify(maybe)) return maybe;
+    maybe = null;
     const next = change(list);
     try {
-      await putFile(INDEX, toB64(await encodeIndex(next)), message, sha);
+      await ghPut(INDEX, { message, content: toB64(await encodeIndex(next)), branch: BRANCH, ...(sha ? { sha } : {}) });
       return next;
     } catch (e) {
-      if (e.status !== 409 && e.status !== 422) throw e;
+      if (dropped(e)) maybe = next;
+      else if (e.status !== 409 && e.status !== 422 && !flaky(e)) throw e;
+      await sleep(400 * (attempt + 1));
     }
   }
   throw new Error("Couldn't save. Try again in a moment.");
@@ -304,15 +345,18 @@ async function packMedia(path, blob) {
 // to send the other phone a real notification. Tapping it opens the diary app from the home screen,
 // where the secret word is already remembered. Phones without that set up get the old ntfy ping.
 // `page` is where the tap should land, relative to diary/ (e.g. "games.html", "shop.html#coupons").
-function notifyPartner(title, message, page) {
-  const to = NAME && partnerOf(NAME);
-  if (!to || LOCAL || !KEY) return;
+function sendNotify(to, title, message, page) {
+  if (!to || LOCAL || !KEY) return Promise.resolve();
   if (!page) page = /mini games/i.test(message + title) ? "games.html" : "./";
   const u = new URL(page, location.origin + "/" + REPO + "/diary/"), url = (u.pathname + u.hash).replace("/" + REPO + "/", "");
-  fetch(`https://api.github.com/repos/${OWNER}/${REPO}/dispatches`, {
+  return fetch(`https://api.github.com/repos/${OWNER}/${REPO}/dispatches`, {
     method: "POST", headers: headers(),
     body: JSON.stringify({ event_type: "notify", client_payload: { to, title, message, url } }),
   }).then(r => { if (!r.ok) throw r; }).catch(() => ntfyPartner(to, title, message));
+}
+function notifyPartner(title, message, page) {
+  const to = NAME && partnerOf(NAME);
+  if (to) sendNotify(to, title, message, page);
 }
 function ntfyPartner(to, title, message) {
   const topic = NOTIFY_TOPICS[to];
@@ -370,6 +414,50 @@ async function updatePushFile(change) {
   throw new Error("Couldn't save, try again.");
 }
 swRegister();
+
+// Right after notifications are switched on: send this phone one, so tapping it proves it opens the app.
+const pushOnTest = () => sendNotify(NAME, "🔔 Notifications are on", "Tap me: I should open the diary app, not Safari ♥", "./");
+
+// A reminder on every phone that hasn't switched notifications on yet (they otherwise fall back to the ntfy
+// app, whose notifications open ntfy instead of the diary). "Not now" hides it for 3 days.
+function showPushNudge(tries = 0) {
+  if (!NAME || LOCAL || $(".push-nudge")) return;
+  if ($(".vault-lock") && tries < 30) return setTimeout(() => showPushNudge(tries + 1), 3000); // after the secret word
+  const st = pushState();
+  if (st === "on" || st === "no") return;
+  if (Date.now() < Number(store.get("push-nudge-until") || 0)) return;
+  const copy = {
+    off: ["🔔 Get notifications that open this app", "Right now they open the ntfy app instead. Switch these on and a tap takes you straight into the diary.", "turn on"],
+    homescreen: ["📲 Put the diary on your home screen", "iPhone only sends notifications to the home-screen app. Then a tap on a notification opens it.", "show me how"],
+    blocked: ["🔔 Notifications are blocked", "iPhone Settings → Notifications → Us ♥ → Allow Notifications. Then a tap opens the diary.", "ok"],
+  }[st];
+  const el = document.createElement("div");
+  el.className = "push-nudge";
+  el.innerHTML = `<b>${copy[0]}</b><p>${copy[1]}</p><div><button type="button" class="save" data-go>${copy[2]}</button><button type="button" class="ghost quiet-btn" data-later>not now</button></div>`;
+  const later = days => { store.set("push-nudge-until", String(Date.now() + days * 864e5)); el.remove(); };
+  el.addEventListener("click", async ev => {
+    if (ev.target.closest("[data-later]")) return later(3);
+    if (!ev.target.closest("[data-go]")) return;
+    if (st === "blocked") return later(3);
+    if (st === "homescreen") { later(1); return showHomeScreenHelp(); }
+    const b = ev.target.closest("[data-go]"); b.disabled = true; b.textContent = "turning on…";
+    try { await enablePush(); el.remove(); toast("🔔 On! A test notification is on its way: tap it."); pushOnTest(); }
+    catch (e) { b.disabled = false; b.textContent = "try again"; toast(e.message || "That didn't work, try again."); }
+  });
+  document.body.appendChild(el);
+}
+function showHomeScreenHelp() {
+  const back = document.createElement("div");
+  back.className = "sheet-back surprise-pop";
+  back.innerHTML = `<div class="sheet small push-help"><h2>Add the diary to your home screen</h2>
+    <ol><li>Open this page in <b>Safari</b></li><li>Tap the <b>Share</b> button (the square with the arrow)</li><li>Tap <b>Add to Home Screen</b>, then <b>Add</b></li>
+    <li>Open <b>Us ♥</b> from your home screen and tap <b>turn on notifications</b></li></ol>
+    <p class="hint">Already have the diary on your home screen from before? <b>Delete that icon first</b> (hold it → Remove App), then add it again. Older icons can't get notifications.</p>
+    <button class="save" data-close>got it</button></div>`;
+  back.addEventListener("click", ev => { if (ev.target === back || ev.target.closest("[data-close]")) back.remove(); });
+  document.body.appendChild(back);
+}
+setTimeout(showPushNudge, 3500);
 
 /* ---------- "come and check" ping 🔔 ---------- */
 // A button on both pages: sends the other phone a notification that opens this page.

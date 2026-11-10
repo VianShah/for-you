@@ -204,14 +204,14 @@ function showSurprise() {
   // Surprises and flowers both pop up once, the first time this phone opens the diary after.
   // Goldies given by hand (Goldies.RULES.BONUS entries with `reveal`) pop up too, with flower confetti.
   const gifts = (window.Goldies?.RULES.BONUS[NAME] || []).filter(b => b.reveal && Date.parse(b.at) <= Date.now()).map(b => ({ ...b, item: "bonus", by: "Goldiee" }));
-  const s = [...surprisesFor(entries, NAME), ...flowersFor(entries, NAME), ...gifts].sort((a, b) => Date.parse(a.at) - Date.parse(b.at)).find(e => !seen.includes(e.id));
+  const s = [...surprisesFor(entries, NAME), ...flowersFor(entries, NAME), ...giftsFor(entries, NAME), ...gifts].sort((a, b) => Date.parse(a.at) - Date.parse(b.at)).find(e => !seen.includes(e.id));
   if (!s) return;
   store.set("surprises-seen", [s.id, ...seen.filter(Boolean)].slice(0, 100).join(","));
   if (s.item === "flowers") return flowerReveal(s);
   if (s.item === "bonus") return giftReveal(s);
   const back = document.createElement("div");
   back.className = "sheet-back surprise-pop";
-  back.innerHTML = `<div class="sheet small surprise-card"><div class="surprise-look">${window.goldiee?.look ? goldiee.look(currentOutfit(entries)) : "🐶"}</div>
+  back.innerHTML = `${petalShower(s.id, 28)}<div class="sheet small surprise-card"><div class="surprise-look">${window.goldiee?.look ? goldiee.look(currentOutfit(entries)) : "🐶"}</div>
     <small>a surprise from ${esc(s.by)}</small><p>${esc(s.note || "Just thinking of you ♥")}</p><button class="save" data-close>aww ♥</button></div>`;
   back.addEventListener("click", ev => { if (ev.target === back || ev.target.closest("[data-close]")) back.remove(); });
   document.body.appendChild(back);
@@ -379,7 +379,7 @@ $("#pushBtn").addEventListener("click", async () => {
   if (pickedWho && pickedWho !== NAME) { NAME = pickedWho; store.set("diary-name", NAME); }
   const st = $("#settingsStatus");
   setStatus(st, "Turning on notifications…");
-  try { await enablePush(); setStatus(st, "🔔 Notifications are on for this phone"); }
+  try { await enablePush(); setStatus(st, "🔔 On! A test notification is on its way: tap it to check it opens the app."); pushOnTest(); }
   catch (err) { setStatus(st, err.message || "That didn't work, try again.", true); }
   syncNotifyBlock();
 });
@@ -988,7 +988,7 @@ function resetComposer() {
   if (state.vthumbUrl) URL.revokeObjectURL(state.vthumbUrl);
   Object.assign(state, { vthumb: null, vthumbUrl: "", vshape: "tall" });
   state.picks.forEach(p => URL.revokeObjectURL(p.url));
-  Object.assign(state, { picks: [], photos: null, mirror: false }); $("#photoTray").hidden = true; $("#trayHint").hidden = true; $("#flipBtn").hidden = true;
+  Object.assign(state, { picks: [], photos: null, mirror: false, draft: null }); $("#photoTray").hidden = true; $("#trayHint").hidden = true; $("#flipBtn").hidden = true;
   recPreview.hidden = true; recTime.textContent = "tap to record";
 }
 
@@ -996,7 +996,12 @@ composer.addEventListener("submit", async e => {
   e.preventDefault();
   const st = $("#status"), btn = $("#saveBtn");
   const f = composer.elements;
-  const id = Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
+  // Trying again after a failed save keeps the same page id and remembers what already went up,
+  // so nothing is uploaded twice. Different pictures start a fresh draft.
+  const blobsNow = state.type === "photo" ? (state.video ? [state.video] : [...(state.photos || [])]) : state.type === "voice" && state.voice ? [state.voice] : [];
+  if (!state.draft || state.draft.blobs.length !== blobsNow.length || !state.draft.blobs.every((b, i) => b === blobsNow[i]))
+    state.draft = { id: Date.now().toString(36) + Math.random().toString(36).slice(2, 6), blobs: blobsNow, done: new Map() };
+  const id = state.draft.id;
   const together = state.from === "together";
   const entry = {
     id, type: state.type,
@@ -1032,29 +1037,33 @@ composer.addEventListener("submit", async e => {
     if (blob) {
       setStatus(st, isVid ? "Uploading the video… (big ones take a minute)" : state.type === "photo" ? "Uploading the picture…" : "Uploading the voice note…");
       const ext = isVid ? videoExt(state.video) : state.type === "photo" ? "jpg" : ({ "audio/mp4": "m4a", "audio/ogg": "ogg" }[state.voiceMime] || "webm");
-      const packed = await packMedia(`${MEDIA_DIR}${id}.${ext}`, blob); // encrypted when the vault is on
-      entry.media = packed.path;
-      const res = await putFile(entry.media, packed.b64, `${isVid ? "Video" : state.type === "photo" ? "Picture" : "Voice note"} from ${NAME}`);
-      entry.mediaSha = res.content.sha;
+      // Encrypts (when the vault is on) and uploads one file, unless this draft already sent it.
+      const send = async (path, data, message) => {
+        if (state.draft.done.has(path)) return state.draft.done.get(path);
+        const packed = await packMedia(path, data);
+        const res = await putFile(packed.path, packed.b64, message);
+        const out = { path: packed.path, sha: res.content.sha };
+        state.draft.done.set(path, out);
+        return out;
+      };
+      const main = await send(`${MEDIA_DIR}${id}.${ext}`, blob, `${isVid ? "Video" : state.type === "photo" ? "Picture" : "Voice note"} from ${NAME}`);
+      entry.media = main.path;
+      entry.mediaSha = main.sha;
       // More than one picture: the rest go up next to the first, and the page shows them all.
       if (!isVid && state.type === "photo" && state.photos?.length > 1) {
         entry.more = [];
         for (const [i, blob] of state.photos.slice(1).entries()) {
           setStatus(st, `Uploading picture ${i + 2} of ${state.photos.length}…`);
-          const m = await packMedia(`${MEDIA_DIR}${id}-${i + 2}.jpg`, blob);
-          await putFile(m.path, m.b64, `Picture from ${NAME}`);
-          entry.more.push(m.path);
+          entry.more.push((await send(`${MEDIA_DIR}${id}-${i + 2}.jpg`, blob, `Picture from ${NAME}`)).path);
         }
       }
       if (isVid && state.vthumb) { // the thumbnail the wall shows
-        const t = await packMedia(`${MEDIA_DIR}${id}-thumb.jpg`, state.vthumb);
-        await putFile(t.path, t.b64, `Video thumbnail from ${NAME}`);
-        entry.thumb = t.path;
+        entry.thumb = (await send(`${MEDIA_DIR}${id}-thumb.jpg`, state.vthumb, `Video thumbnail from ${NAME}`)).path;
       }
     }
     setStatus(st, "Sticking it in…");
     const before = myPoints(entries);
-    entries = await updateIndex(list => [entry, ...list], `A new ${kind} from ${entry.author}`);
+    entries = await updateIndex(list => list.some(x => x.id === entry.id) ? list : [entry, ...list], `A new ${kind} from ${entry.author}`);
     pointsToast(before, entries);
     window.goldiee?.cry(Goldies.score(entries, NAME).crying);
     notifyPartner(
@@ -1073,7 +1082,7 @@ composer.addEventListener("submit", async e => {
     if (theirs) setTimeout(() => window.goldiee?.say(`${theirs.author}'s answer is unlocked 🔓`,
       () => $(`.card[data-id="${CSS.escape(theirs.id)}"]`)?.scrollIntoView({ behavior: reduceMotion ? "auto" : "smooth", block: "center" }), "read it →"), 1200);
   } catch (err) {
-    setStatus(st, err.message, true);
+    setStatus(st, friendlyError(err), true);
   } finally {
     btn.disabled = false;
   }
