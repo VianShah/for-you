@@ -511,6 +511,38 @@ function renderGoldieBar(list) {
   el.hidden = false;
   el.onclick = () => openGoldieRules(list);
 }
+/* ---------- the "us" page (feelings, letters, bucket list, recap) ---------- */
+const MOODS = [
+  { id: "happy", emoji: "😊", label: "happy" }, { id: "loved", emoji: "🥰", label: "loved" },
+  { id: "excited", emoji: "🤩", label: "excited" }, { id: "calm", emoji: "😌", label: "calm" },
+  { id: "tired", emoji: "😴", label: "tired" }, { id: "low", emoji: "😔", label: "low" },
+  { id: "stressed", emoji: "😰", label: "stressed" }, { id: "upset", emoji: "😠", label: "upset" },
+];
+const LOW_MOODS = ["low", "stressed", "upset"];
+const moodById = id => MOODS.find(m => m.id === id);
+const dayKey = (d = new Date()) => d.toLocaleDateString("en-CA"); // 2026-11-12, on this phone's clock
+// Something waiting on the "us" page: a letter to open, or a partner having a heavy day (said once each).
+function usWaiting(list) {
+  if (!NAME) return null;
+  const them = partnerOf(NAME);
+  const opened = id => (list || []).some(b => b.type === "buy" && b.item === "letter" && b.letter === id && b.by === NAME && !b.cancelled);
+  const letter = (list || []).find(e => e.type === "letter" && !e.status && e.to === NAME && !opened(e.id));
+  if (letter) return { msg: `${them} wrote you a letter 💌 “${letter.topic?.title || "Open when…"}”`, page: "us.html#letters", label: "see it →" };
+  const m = (list || []).find(e => e.type === "mood" && e.by === them && e.day === dayKey() && LOW_MOODS.includes(e.mood));
+  if (m && store.get("mood-seen") !== m.id + m.at) return { msg: `${them} is having a heavy day 💛 a little message could help`, page: "us.html#mood", label: "say hi →", seen: () => store.set("mood-seen", m.id + m.at) };
+  // The first week of a new month: last month's recap is ready (said once).
+  const d = new Date();
+  if (d.getDate() <= 7) {
+    const p = new Date(d.getFullYear(), d.getMonth() - 1, 1), key = p.getFullYear() + "-" + String(p.getMonth() + 1).padStart(2, "0");
+    const had = (list || []).some(e => ["note", "photo", "video", "voice"].includes(e.type) && e.at && new Date(e.at).getFullYear() === p.getFullYear() && new Date(e.at).getMonth() === p.getMonth());
+    if (had && store.get("recap-seen") !== key) {
+      store.set("recap-seen", key);
+      return { msg: `our ${p.toLocaleDateString("en-GB", { month: "long" })} recap is ready 📅`, page: "us.html#recap", label: "see it →" };
+    }
+  }
+  return null;
+}
+
 function openGoldieRules(list) {
   const R = Goldies.RULES, me = NAME && Goldies.score(list, NAME);
   const when = at => new Date(at).toLocaleString("en-GB", { day: "numeric", month: "short", hour: "numeric", minute: "2-digit", hour12: true }).toLowerCase();
@@ -524,6 +556,8 @@ function openGoldieRules(list) {
       <li><b>+${R.VOICE}</b> a voice note</li>
       <li><b>+${R.LONG}</b> opening your heart (over ${R.LONG_CHARS} characters)</li>
       <li><b>+${R.PHOTO}</b> a picture or a video</li>
+      <li><b>+${R.LETTER}</b> writing a letter on the topic the diary gives you (once a topic, once a day) 💌</li>
+      <li><b class="minus">−${R.LETTER_COST}</b> opening a letter they wrote you, to read it and keep it</li>
       <li><b>+${R.KW_SPOT}</b> a spot-on guess in “who knows whom” (+${R.KW_CLOSE} if close, +${R.KW_ANSWER} for answering about yourself)</li>
       <li><b class="minus">−${R.PENALTY}</b> every ${R.GAP_MIN / 60} hours without posting or replying</li>
       <li><b>💤</b> sleep time, 1 am – 8:30 am: nothing counts (nothing lost, nothing earned)</li>

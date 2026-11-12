@@ -270,6 +270,8 @@ function goldieeNudge() {
   if (!KEY) return g.say("this phone isn't unlocked yet. I'll show you how 🔑", () => openSettings(`To write, open the setup link sent to you. Ask ${PEOPLE[0]} for it ♥`), "unlock →");
   if (!NAME) return g.say("whose phone is this? tell me so I sign your pages 🐾", () => openSettings("First, tap whose phone this is."), "choose →");
   if (goldieeCry(entries, () => { state.prompt = null; openComposer(); })) return;
+  const us = usWaiting(entries);
+  if (us) return g.say(us.msg, () => { us.seen?.(); location.href = us.page; }, us.label);
   const waiting = entries.find(isLocked);
   if (waiting) return g.say(`${waiting.author} answered a question. Answer it too to see theirs 💭`, () => startAnswer(waiting.prompt), "answer it →");
   // A "who knows whom" round in the mini games waiting on this phone.

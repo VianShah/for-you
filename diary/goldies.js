@@ -22,6 +22,7 @@
     TEXT: 5, VOICE: 5, LONG: 10, LONG_CHARS: 200, PHOTO: 15,
     CALL: 5, CALL_BLOCK_MIN: 15,        // +5 for every 15 minutes on a call together
     KW_ANSWER: 5, KW_SPOT: 20, KW_CLOSE: 10, // "who knows whom": answering about yourself / a spot-on / a close guess
+    LETTER: 150, LETTER_COST: 150, LETTER_MIN_CHARS: 100, // a letter on a topic the diary gave: +150 to write it, 150 to open it
     PIN_COST: 100, PIN_DAYS: 3,         // a pinned picture stays on the love page for 3 days
     RACE_BETS: [0, 50, 150],            // what a puzzle race can be played for (winner takes it from the loser)
     // Goldies added by hand (not earned in the diary): { name: [{ at, pts, why }] }.
@@ -87,6 +88,18 @@
   const PAGE_TYPES = ["note", "photo", "video", "voice"];
 
   // Every moment that earned someone points, oldest first.
+  // Which of this person's letters earn goldies: a real letter (long enough), once per topic, one reward a day.
+  function letterRewards(entries, name) {
+    const ls = (entries || []).filter(e => e.type === "letter" && e.by === name && !e.status).sort((a, b) => Date.parse(a.at) - Date.parse(b.at));
+    const topics = new Set(), days = new Set(), won = new Set();
+    for (const e of ls) {
+      const at = Date.parse(e.at), day = localDay(at), t = e.topic?.id;
+      if (at < START || !t || (e.text || "").trim().length < RULES.LETTER_MIN_CHARS || topics.has(t) || days.has(day)) continue;
+      topics.add(t); days.add(day); won.add(e.id);
+    }
+    return won;
+  }
+
   function events(entries, name, now = Date.now()) {
     const out = [{ at: START, pts: RULES.WELCOME, why: "a welcome gift from Goldiee", gift: true }];
     for (const b of RULES.BONUS[name] || []) out.push({ at: Date.parse(b.at), pts: b.pts, why: b.why, gift: true, noClock: true });
@@ -139,6 +152,9 @@
         out.push({ at: rat, pts, why: r.kind === "photo" ? "a picture reply" : r.kind === "video" ? "a video reply" : r.kind === "voice" ? "a voice reply" : "a reply" });
       }
     }
+    // Letters pay a flat reward, whatever the hour; writing one also counts as showing up.
+    const won = letterRewards(entries, name);
+    for (const e of entries || []) if (won.has(e.id)) out.push({ at: Date.parse(e.at), pts: RULES.LETTER, why: `a letter 💌 ${e.topic?.title || ""}`.trim(), fixed: true });
     // Sleep time doesn't count: things posted then still reset the clock, but earn nothing.
     // A call that starts while you're awake counts in full, even if it runs on past 1 am.
     for (const x of out) if (!x.gift && !x.fixed && !isAwake(x.callStart ?? x.at)) { x.pts = 0; x.why += " (sleep time)"; }
@@ -203,7 +219,7 @@
 
   // Shop purchases, for the "your last goldies" list.
   const SHOP_WHY = { outfit: "an outfit for Goldiee 🐶", theme: "a diary backdrop for the day 🎨", peek: "a peek at an answer 👀", coupon: "a dare 😈",
-    gift: "goldies gifted 🎁", shield: "a quiet-day shield 🛡", pintop: "a page pinned to the top 📌", surprise: "a surprise popup 🎉", superping: "a super ping 📣", flowers: "flowers 💐" };
+    gift: "goldies gifted 🎁", shield: "a quiet-day shield 🛡", pintop: "a page pinned to the top 📌", surprise: "a surprise popup 🎉", superping: "a super ping 📣", flowers: "flowers 💐", letter: "opened a letter 💌" };
   const shopHistory = (entries, name) => (entries || []).filter(e => e.type === "buy" && e.by === name && !e.cancelled && e.cost)
     .map(e => ({ at: Date.parse(e.at), pts: -e.cost, why: SHOP_WHY[e.item] || "the shop" }));
 
@@ -237,5 +253,5 @@
 
   // Is a pin still on the love page? ({ at } from entry.pin)
   const pinLive = (pin, now = Date.now()) => !!pin && now - Date.parse(pin.at) < RULES.PIN_DAYS * DAY * MIN;
-  globalThis.Goldies = { dareDue, pinLive, RULES, awakeMinutes, awakeMs, addAwake, isAwake, events, score, streak, textPoints, races };
+  globalThis.Goldies = { letterRewards, dareDue, pinLive, RULES, awakeMinutes, awakeMs, addAwake, isAwake, events, score, streak, textPoints, races };
 })();
