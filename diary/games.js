@@ -253,4 +253,5 @@ function renderProgress() {
     renderRace();
     renderProgress();
   }, allPages);
+  appIsReady();
 })();

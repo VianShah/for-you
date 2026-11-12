@@ -379,6 +379,31 @@ async function feedWidget() {
   } catch {}
 }
 
+/* ---------- the iPhone app asks for things ---------- */
+// Long-press shortcuts, widget buttons and notification taps arrive as appAction("ping"),
+// appAction("open:<page id>")… They wait until the page has the diary loaded (appIsReady).
+const appQueue = [];
+let appReady = false;
+window.appAction = action => { appReady ? runAppAction(String(action)) : appQueue.push(String(action)); };
+function appIsReady() {
+  if (appReady) return;
+  appReady = true;
+  appQueue.splice(0).forEach(runAppAction);
+}
+function runAppAction(a) {
+  if (a === "ping") return pingPartner();
+  if (a === "heart") return thinkingOfYou();
+  if (a === "shop") return /shop\.html$/.test(location.pathname) ? $("#coupons")?.scrollIntoView() : (location.href = "shop.html#coupons");
+  // The rest happen in the diary itself: from the games or the shop, go there first.
+  if (typeof window.diaryAppAction !== "function") { location.href = "./#app=" + encodeURIComponent(a); return; }
+  window.diaryAppAction(a);
+}
+function thinkingOfYou() {
+  if (!NAME) return toast("Choose whose phone this is in ⚙ settings first.");
+  notifyPartner(`❤️ ${NAME} is thinking of you`, "Just because ♥");
+  toast(`❤️ Sent to ${partnerOf(NAME)}`);
+}
+
 /* ---------- notifications on this phone 🔔 (web push) ---------- */
 const VAPID_PUBLIC = "BAtscJGZ_lyQig8866R2cuR_-rotxNMLBw9GgsimXVw9IxlsPV4yqLRpI803yI0iyF17qMhYEWMvL4k4nQLu5qU";
 const PUSH_FILE = "diary/push.json"; // { Vian: [subscription…], Jovena: [...] }, encrypted like the diary
@@ -390,7 +415,7 @@ const pushSupported = () => "serviceWorker" in navigator && "PushManager" in win
 // "on": this phone gets notifications · "off": it could, tap to turn on · "blocked": said no in the past
 // "homescreen": an iPhone in Safari, it has to be opened from the home screen first · "no": can't here
 function pushState() {
-  if (inApp) return "app"; // the app can't get its own notifications yet (needs a paid Apple developer account)
+  if (inApp) return "app"; // the app makes its own notifications (ios/Sources/OurDiary/Notifications.swift)
   if (isIOS && !isStandalone()) return "homescreen";
   if (!pushSupported()) return "no";
   if (Notification.permission === "denied") return "blocked";

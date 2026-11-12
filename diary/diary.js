@@ -240,6 +240,24 @@ function openNewest() {
   return true;
 }
 
+// What the iPhone app can ask the diary to do (see appAction in core.js).
+window.diaryAppAction = a => {
+  if (a.startsWith("open:")) {
+    const id = a.slice(5);
+    if (!entries.some(e => e.id === id)) return;
+    if (!$("#postBack").hidden) closeSheet($("#postBack"));
+    return openPost(id);
+  }
+  if (a === "new" || a === "camera") {
+    if (!canWrite()) return;
+    state.prompt = null;
+    openComposer();
+    if (a === "camera") { $('.tab[data-type="photo"]')?.click(); setTimeout(() => $("#camBtn")?.click(), 350); }
+    return;
+  }
+  if (a === "call") return startCall("video");
+};
+
 let autoRefreshOn = false;
 async function refresh() {
   try {
@@ -247,7 +265,10 @@ async function refresh() {
     lastSeen = Number(store.get("diary-seen-" + NAME)) || 0;
     render();
     emptyOldBin();
+    // Sent here by the app from the games or the shop (#app=…): do it now.
+    if (location.hash.startsWith("#app=")) { appAction(decodeURIComponent(location.hash.slice(5))); history.replaceState(null, "", location.pathname + location.search); }
     if (!openNewest()) setTimeout(goldieeNudge, 1500);
+    appIsReady();
     if (!autoRefreshOn) {
       autoRefreshOn = true;
       startAutoRefresh(list => {
@@ -373,7 +394,7 @@ function syncNotifyBlock() {
     blocked: "Notifications are turned off for the diary. Turn them on in the iPhone's Settings → Notifications → Us ♥.",
     homescreen: "On iPhone, notifications only work from the home-screen app:<br>1. Tap the <b>Share</b> button (the square with the arrow) at the bottom of Safari<br>2. Tap <b>Add to Home Screen</b>, then <b>Add</b><br>3. Open <b>Us ♥</b> from your home screen, come back to ⚙ and tap <b>turn on notifications</b>",
     no: "This browser can't show notifications.",
-    app: "In the iPhone app, notifications still come from the ntfy app for now: the app's own need a paid Apple developer account.",
+    app: "In the iPhone app, the app sends its own notifications (allow them when it asks): you can reply or ❤️ right from the lock screen. They come when iOS lets the app check, usually within 15 minutes to an hour; the ntfy app stays as the instant backup.",
   }[st];
 }
 $("#pushBtn").addEventListener("click", async () => {

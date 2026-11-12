@@ -356,6 +356,7 @@ document.addEventListener("click", async ev => {
   setInterval(() => renderGoldieBar(allPages), 60000);
   renderShop();
   startAutoRefresh(list => { allPages = list; renderGoldieBar(allPages); renderShop(); }, allPages);
+  appIsReady();
   if (location.hash) $(location.hash)?.scrollIntoView();
   const mine = NAME && openCoupons(allPages, NAME).filter(e => !e.done);
   if (mine?.length) setTimeout(() => goldiee.say(`${mine[0].by} dared you 😈 brave enough?`, () => $("#coupons").scrollIntoView({ behavior: "smooth" }), "show me →"), 1500);
