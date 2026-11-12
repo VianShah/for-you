@@ -1,0 +1,10 @@
+version: 1
+bundleID: com.vianshah.ourdiary
+product: OurDiary
+infoPath: Support/Info.plist
+entitlementsPath: Support/App.entitlements
+iconPath: Resources/AppIcon.png
+extensions:
+  - product: OurDiaryWidget
+    infoPath: Support/OurDiaryWidget-Info.plist
+    entitlementsPath: Support/Widget.entitlements

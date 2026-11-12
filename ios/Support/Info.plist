@@ -1,0 +1,33 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<key>CFBundleDisplayName</key>
+	<string>Us ♥</string>
+	<key>CFBundleShortVersionString</key>
+	<string>1.0</string>
+	<key>CFBundleVersion</key>
+	<string>1</string>
+	<key>NSCameraUsageDescription</key>
+	<string>So you can take pictures and videos for our diary.</string>
+	<key>NSMicrophoneUsageDescription</key>
+	<string>So you can record voice notes and videos for our diary.</string>
+	<key>NSPhotoLibraryUsageDescription</key>
+	<string>So you can add pictures and videos from your library to our diary.</string>
+	<key>NSPhotoLibraryAddUsageDescription</key>
+	<string>So you can save pictures from our diary to your Photos.</string>
+	<key>LSApplicationQueriesSchemes</key>
+	<array>
+		<string>facetime</string>
+		<string>facetime-audio</string>
+	</array>
+	<key>UILaunchScreen</key>
+	<dict/>
+	<key>UISupportedInterfaceOrientations</key>
+	<array>
+		<string>UIInterfaceOrientationPortrait</string>
+		<string>UIInterfaceOrientationLandscapeLeft</string>
+		<string>UIInterfaceOrientationLandscapeRight</string>
+	</array>
+</dict>
+</plist>
