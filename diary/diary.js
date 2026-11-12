@@ -373,6 +373,7 @@ function syncNotifyBlock() {
     blocked: "Notifications are turned off for the diary. Turn them on in the iPhone's Settings → Notifications → Us ♥.",
     homescreen: "On iPhone, notifications only work from the home-screen app:<br>1. Tap the <b>Share</b> button (the square with the arrow) at the bottom of Safari<br>2. Tap <b>Add to Home Screen</b>, then <b>Add</b><br>3. Open <b>Us ♥</b> from your home screen, come back to ⚙ and tap <b>turn on notifications</b>",
     no: "This browser can't show notifications.",
+    app: "In the iPhone app, notifications still come from the ntfy app for now: the app's own need a paid Apple developer account.",
   }[st];
 }
 $("#pushBtn").addEventListener("click", async () => {

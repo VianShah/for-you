@@ -364,15 +364,33 @@ function ntfyPartner(to, title, message) {
   fetch("https://ntfy.sh/", { method: "POST", body: JSON.stringify({ topic, title, message, tags: ["love_letter"] }) }).catch(() => {});
 }
 
+/* ---------- the iPhone app's widgets ---------- */
+// In the app, hand its widgets what they need to read the diary on their own: whose phone this
+// is and the key that opens it. It goes only to the app on this phone (App Group storage).
+let widgetFed = "";
+async function feedWidget() {
+  const bridge = window.webkit?.messageHandlers?.ourDiaryApp;
+  if (!inApp || !bridge || !CRYPTO_KEY || !NAME) return;
+  try {
+    const key = Vault.b64(new Uint8Array(await crypto.subtle.exportKey("raw", CRYPTO_KEY)));
+    if (widgetFed === NAME + key) return;
+    widgetFed = NAME + key;
+    bridge.postMessage({ type: "widget", name: NAME, key });
+  } catch {}
+}
+
 /* ---------- notifications on this phone 🔔 (web push) ---------- */
 const VAPID_PUBLIC = "BAtscJGZ_lyQig8866R2cuR_-rotxNMLBw9GgsimXVw9IxlsPV4yqLRpI803yI0iyF17qMhYEWMvL4k4nQLu5qU";
 const PUSH_FILE = "diary/push.json"; // { Vian: [subscription…], Jovena: [...] }, encrypted like the diary
 const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) || (navigator.platform === "MacIntel" && navigator.maxTouchPoints > 1);
+// Inside the iPhone app (ios/): it says so in its user agent, and has its own way to the widget.
+const inApp = /OurDiaryApp\//.test(navigator.userAgent);
 const isStandalone = () => matchMedia("(display-mode: standalone)").matches || navigator.standalone === true;
 const pushSupported = () => "serviceWorker" in navigator && "PushManager" in window && "Notification" in window;
 // "on": this phone gets notifications · "off": it could, tap to turn on · "blocked": said no in the past
 // "homescreen": an iPhone in Safari, it has to be opened from the home screen first · "no": can't here
 function pushState() {
+  if (inApp) return "app"; // the app can't get its own notifications yet (needs a paid Apple developer account)
   if (isIOS && !isStandalone()) return "homescreen";
   if (!pushSupported()) return "no";
   if (Notification.permission === "denied") return "blocked";
@@ -424,7 +442,7 @@ function showPushNudge(tries = 0) {
   if (!NAME || LOCAL || $(".push-nudge")) return;
   if ($(".vault-lock") && tries < 30) return setTimeout(() => showPushNudge(tries + 1), 3000); // after the secret word
   const st = pushState();
-  if (st === "on" || st === "no") return;
+  if (st === "on" || st === "no" || st === "app") return;
   if (Date.now() < Number(store.get("push-nudge-until") || 0)) return;
   const copy = {
     off: ["🔔 Get notifications that open this app", "Right now they open the ntfy app instead. Switch these on and a tap takes you straight into the diary.", "turn on"],
@@ -496,6 +514,7 @@ function renderGoldieBar(list) {
   const hint = !mine ? "" : mine.shieldUntil ? `🛡 shielded till ${new Date(mine.shieldUntil).toLocaleTimeString("en-GB", { hour: "numeric", minute: "2-digit", hour12: true }).toLowerCase()} · no −${Goldies.RULES.PENALTY}s` : `−${Goldies.RULES.PENALTY} in <b class="gb-count" data-penalty-at="${mine.nextPenaltyAt}">${fmtLeft(Goldies.awakeMs(Date.now(), mine.nextPenaltyAt))}</b>${Goldies.isAwake(Date.now()) ? "" : " · paused, you're asleep 💤"}`;
   const st = Goldies.streak(list, PEOPLE);
   goldieList = list;
+  feedWidget();
   // Bought in the shop (shop-items.js): Goldiee's outfit, and today's backdrop on every page.
   if (typeof currentOutfit === "function") {
     window.goldiee?.wear?.(currentOutfit(list));
