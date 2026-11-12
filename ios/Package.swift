@@ -22,12 +22,19 @@ let package = Package(
         ),
     ],
     targets: [
+        // Reading, opening and writing the diary natively: shared by the app and the widgets.
+        .target(
+            name: "DiaryKit",
+            swiftSettings: [.swiftLanguageMode(.v5)]
+        ),
         .target(
             name: "OurDiary",
+            dependencies: ["DiaryKit"],
             swiftSettings: [.swiftLanguageMode(.v5)]
         ),
         .target(
             name: "OurDiaryWidget",
+            dependencies: ["DiaryKit"],
             swiftSettings: [.swiftLanguageMode(.v5)]
         ),
     ]

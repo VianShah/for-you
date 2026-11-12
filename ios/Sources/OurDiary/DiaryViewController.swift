@@ -1,4 +1,6 @@
 #if canImport(UIKit)
+import DiaryKit
+import LocalAuthentication
 import SwiftUI
 import UIKit
 import WebKit
@@ -10,8 +12,6 @@ enum Diary {
     static let host = "vianshah.github.io"
     static let pathPrefix = "/for-you/"
     static func isDiary(_ url: URL) -> Bool { url.host == host && url.path.hasPrefix(pathPrefix) }
-    /// Shared with the widget (App Group): which of us this phone is, and the key that opens the diary.
-    static let appGroup = "group.com.vianshah.ourdiary"
     /// The diary's own cream (and its dark desk in dark mode), shown while it loads.
     static let background = UIColor { traits in
         traits.userInterfaceStyle == .dark
@@ -30,6 +30,11 @@ final class DiaryViewController: UIViewController, WKNavigationDelegate, WKUIDel
     private let refresh = UIRefreshControl()
     private var offline: UIView?
     private var downloads: [ObjectIdentifier: URL] = [:]
+    private var pageReady = false
+    private var waitingActions: [String] = []
+    private var lockCover: UIView?
+    private var wentAway: Date?
+    private static let lockAfter: TimeInterval = 5 * 60 // Face ID again after 5 minutes away
 
     override func loadView() {
         let config = WKWebViewConfiguration()
@@ -58,6 +63,77 @@ final class DiaryViewController: UIViewController, WKNavigationDelegate, WKUIDel
     override func viewDidLoad() {
         super.viewDidLoad()
         webView.load(URLRequest(url: Diary.start))
+        NotificationCenter.default.addObserver(forName: Router.action, object: nil, queue: .main) { [weak self] note in
+            if let action = note.object as? String { self?.run(action) }
+        }
+        let center = NotificationCenter.default
+        center.addObserver(forName: UIApplication.didEnterBackgroundNotification, object: nil, queue: .main) { [weak self] _ in
+            self?.wentAway = Date()
+            self?.showLock() // also hides the diary in the app switcher
+        }
+        center.addObserver(forName: UIApplication.willEnterForegroundNotification, object: nil, queue: .main) { [weak self] _ in
+            guard let self else { return }
+            if let away = wentAway, Date().timeIntervalSince(away) < Self.lockAfter { hideLock() } else { unlock() }
+        }
+        if DiaryKit.isSetUp { showLock(); unlock() } // once set up, the app opens with Face ID
+    }
+
+    // MARK: - Asking the page to do things (shortcuts, widget buttons, notification taps)
+
+    private func run(_ action: String) {
+        guard pageReady else { return waitingActions.append(action) }
+        guard let json = try? JSONSerialization.data(withJSONObject: [action]),
+              let arg = String(data: json, encoding: .utf8) else { return }
+        webView.evaluateJavaScript("window.appAction && window.appAction(\(arg)[0])")
+    }
+
+    // MARK: - Face ID
+
+    private func showLock() {
+        guard DiaryKit.isSetUp, lockCover == nil else { return }
+        let cover = UIView()
+        cover.backgroundColor = Diary.background
+        let box = UIStackView()
+        box.axis = .vertical
+        box.alignment = .center
+        box.spacing = 12
+        let pup = UILabel(); pup.text = "🐶"; pup.font = .systemFont(ofSize: 64)
+        let name = UILabel(); name.text = "Us ♥"; name.font = .preferredFont(forTextStyle: .largeTitle)
+        name.textColor = UIColor(red: 0.431, green: 0.137, blue: 0.216, alpha: 1)
+        var open = UIButton.Configuration.filled()
+        open.title = "open"
+        open.image = UIImage(systemName: "faceid")
+        open.imagePadding = 8
+        open.cornerStyle = .capsule
+        open.baseBackgroundColor = UIColor(red: 0.431, green: 0.137, blue: 0.216, alpha: 1)
+        let button = UIButton(configuration: open, primaryAction: UIAction { [weak self] _ in self?.unlock() })
+        [pup, name, button].forEach(box.addArrangedSubview)
+        cover.translatesAutoresizingMaskIntoConstraints = false
+        box.translatesAutoresizingMaskIntoConstraints = false
+        cover.addSubview(box)
+        view.addSubview(cover)
+        NSLayoutConstraint.activate([
+            cover.topAnchor.constraint(equalTo: view.topAnchor), cover.bottomAnchor.constraint(equalTo: view.bottomAnchor),
+            cover.leadingAnchor.constraint(equalTo: view.leadingAnchor), cover.trailingAnchor.constraint(equalTo: view.trailingAnchor),
+            box.centerXAnchor.constraint(equalTo: cover.centerXAnchor), box.centerYAnchor.constraint(equalTo: cover.centerYAnchor),
+        ])
+        lockCover = cover
+    }
+
+    private func hideLock() {
+        lockCover?.removeFromSuperview()
+        lockCover = nil
+    }
+
+    /// Face ID (or the phone's passcode). A phone without either just opens.
+    private func unlock() {
+        guard lockCover != nil else { return }
+        let context = LAContext()
+        var error: NSError?
+        guard context.canEvaluatePolicy(.deviceOwnerAuthentication, error: &error) else { return hideLock() }
+        context.evaluatePolicy(.deviceOwnerAuthentication, localizedReason: "Open our diary") { ok, _ in
+            DispatchQueue.main.async { if ok { self.hideLock() } }
+        }
     }
 
     @objc private func pullToRefresh() {
@@ -116,12 +192,17 @@ final class DiaryViewController: UIViewController, WKNavigationDelegate, WKUIDel
     func webView(_ webView: WKWebView, didFinish navigation: WKNavigation!) {
         refresh.endRefreshing()
         hideOffline()
+        pageReady = true
+        let waiting = waitingActions
+        waitingActions = []
+        waiting.forEach(run) // the page itself waits until the diary is unlocked
     }
 
     func webView(_ webView: WKWebView, didFailProvisionalNavigation navigation: WKNavigation!, withError error: Error) {
         refresh.endRefreshing()
         let code = (error as NSError).code
         if code == NSURLErrorCancelled || code == 102 /* frame load interrupted, e.g. a download */ { return }
+        pageReady = false
         showOffline()
     }
 
@@ -253,17 +334,23 @@ final class DiaryViewController: UIViewController, WKNavigationDelegate, WKUIDel
 
     // MARK: - Feeding the widget
 
-    /// The diary posts `{ type: "widget", name, key }` once it's unlocked: the widget keeps both
+    /// The diary posts `{ type: "widget", name, key }` once it's unlocked: the widgets and notifications keep both
     /// in the App Group so it can read the diary on its own. The key never leaves this iPhone.
     func userContentController(_ controller: WKUserContentController, didReceive message: WKScriptMessage) {
         guard message.frameInfo.isMainFrame, message.frameInfo.securityOrigin.host == Diary.host,
               let body = message.body as? [String: Any], body["type"] as? String == "widget",
               let name = body["name"] as? String, let key = body["key"] as? String,
-              let shared = UserDefaults(suiteName: Diary.appGroup) else { return }
+              let shared = DiaryKit.shared else { return }
         if shared.string(forKey: "name") == name && shared.string(forKey: "key") == key { return }
+        let firstTime = shared.string(forKey: "key") == nil
         shared.set(name, forKey: "name")
         shared.set(key, forKey: "key")
         WidgetCenter.shared.reloadAllTimelines()
+        if firstTime {
+            Notifications.ask()          // the app's own notifications, with reply
+            BackgroundCheck.markSeen()
+            BackgroundCheck.schedule()
+        }
     }
 
     // MARK: - Helpers

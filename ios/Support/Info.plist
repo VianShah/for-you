@@ -2,24 +2,82 @@
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0">
 <dict>
+	<key>BGTaskSchedulerPermittedIdentifiers</key>
+	<array>
+		<string>com.vianshah.ourdiary.refresh</string>
+	</array>
 	<key>CFBundleDisplayName</key>
 	<string>Us ♥</string>
 	<key>CFBundleShortVersionString</key>
 	<string>1.0</string>
+	<key>CFBundleURLTypes</key>
+	<array>
+		<dict>
+			<key>CFBundleURLName</key>
+			<string>com.vianshah.ourdiary</string>
+			<key>CFBundleURLSchemes</key>
+			<array>
+				<string>ourdiary</string>
+			</array>
+		</dict>
+	</array>
 	<key>CFBundleVersion</key>
 	<string>1</string>
-	<key>NSCameraUsageDescription</key>
-	<string>So you can take pictures and videos for our diary.</string>
-	<key>NSMicrophoneUsageDescription</key>
-	<string>So you can record voice notes and videos for our diary.</string>
-	<key>NSPhotoLibraryUsageDescription</key>
-	<string>So you can add pictures and videos from your library to our diary.</string>
-	<key>NSPhotoLibraryAddUsageDescription</key>
-	<string>So you can save pictures from our diary to your Photos.</string>
 	<key>LSApplicationQueriesSchemes</key>
 	<array>
 		<string>facetime</string>
 		<string>facetime-audio</string>
+	</array>
+	<key>NSCameraUsageDescription</key>
+	<string>So you can take pictures and videos for our diary.</string>
+	<key>NSFaceIDUsageDescription</key>
+	<string>So Face ID can open our diary.</string>
+	<key>NSMicrophoneUsageDescription</key>
+	<string>So you can record voice notes and videos for our diary.</string>
+	<key>NSPhotoLibraryAddUsageDescription</key>
+	<string>So you can save pictures from our diary to your Photos.</string>
+	<key>NSPhotoLibraryUsageDescription</key>
+	<string>So you can add pictures and videos from your library to our diary.</string>
+	<key>UIApplicationShortcutItems</key>
+	<array>
+		<dict>
+			<key>UIApplicationShortcutItemIconSymbolName</key>
+			<string>square.and.pencil</string>
+			<key>UIApplicationShortcutItemTitle</key>
+			<string>Write a page</string>
+			<key>UIApplicationShortcutItemType</key>
+			<string>com.vianshah.ourdiary.new</string>
+		</dict>
+		<dict>
+			<key>UIApplicationShortcutItemIconSymbolName</key>
+			<string>camera</string>
+			<key>UIApplicationShortcutItemTitle</key>
+			<string>Camera</string>
+			<key>UIApplicationShortcutItemType</key>
+			<string>com.vianshah.ourdiary.camera</string>
+		</dict>
+		<dict>
+			<key>UIApplicationShortcutItemIconSymbolName</key>
+			<string>video</string>
+			<key>UIApplicationShortcutItemTitle</key>
+			<string>FaceTime</string>
+			<key>UIApplicationShortcutItemType</key>
+			<string>com.vianshah.ourdiary.call</string>
+		</dict>
+		<dict>
+			<key>UIApplicationShortcutItemIconSymbolName</key>
+			<string>bell</string>
+			<key>UIApplicationShortcutItemSubtitle</key>
+			<string>come and check</string>
+			<key>UIApplicationShortcutItemTitle</key>
+			<string>Ping</string>
+			<key>UIApplicationShortcutItemType</key>
+			<string>com.vianshah.ourdiary.ping</string>
+		</dict>
+	</array>
+	<key>UIBackgroundModes</key>
+	<array>
+		<string>fetch</string>
 	</array>
 	<key>UILaunchScreen</key>
 	<dict/>

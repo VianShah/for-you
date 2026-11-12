@@ -1,4 +1,6 @@
+import DiaryKit
 import SwiftUI
+import UIKit
 import WidgetKit
 
 @main
@@ -6,6 +8,7 @@ struct OurDiaryWidgets: WidgetBundle {
     var body: some Widget {
         GoldiesWidget()
         LatestWidget()
+        PhotoWidget()
     }
 }
 
@@ -21,7 +24,7 @@ struct DiaryProvider: TimelineProvider {
     func placeholder(in context: Context) -> DiaryEntry { DiaryEntry(summary: .sample) }
 
     func getSnapshot(in context: Context, completion: @escaping (DiaryEntry) -> Void) {
-        if context.isPreview { return completion(DiaryEntry(summary: DiaryData.cached() ?? .sample)) }
+        if context.isPreview { return completion(DiaryEntry(summary: DiaryKit.cachedSummary() ?? .sample)) }
         Task { completion(await entry()) }
     }
 
@@ -33,8 +36,8 @@ struct DiaryProvider: TimelineProvider {
     }
 
     private func entry() async -> DiaryEntry {
-        guard DiaryData.isSetUp else { return DiaryEntry(setUp: false) }
-        let summary = (try? await DiaryData.load()) ?? DiaryData.cached()
+        guard DiaryKit.isSetUp else { return DiaryEntry(setUp: false) }
+        let summary = (try? await DiaryKit.summary()) ?? DiaryKit.cachedSummary()
         return DiaryEntry(summary: summary)
     }
 }
@@ -139,11 +142,27 @@ struct GoldiesView: View {
                 person(s.them, me: false)
             }
             Divider().overlay(Look.rose.opacity(0.3))
-            HStack {
-                countdown(s)
-                Spacer()
-                Text("📞 \(callTime(s.callsToday)) today").font(.caption2).foregroundStyle(Look.muted)
+            HStack(spacing: 6) {
+                VStack(alignment: .leading, spacing: 2) {
+                    countdown(s)
+                    Text("📞 \(callTime(s.callsToday)) today").font(.caption2).foregroundStyle(Look.muted)
+                }
+                Spacer(minLength: 4)
+                // Each opens the app for a moment and does it there.
+                action("bell.fill", "ourdiary://ping")
+                action("heart.fill", "ourdiary://heart")
+                action("square.and.pencil", "ourdiary://new")
             }
+        }
+    }
+
+    private func action(_ symbol: String, _ link: String) -> some View {
+        Link(destination: URL(string: link)!) {
+            Image(systemName: symbol)
+                .font(.system(size: 14, weight: .semibold))
+                .foregroundStyle(Look.cream)
+                .frame(width: 32, height: 32)
+                .background(Circle().fill(Look.wine))
         }
     }
 
@@ -219,5 +238,80 @@ struct LatestView: View {
                 .frame(maxWidth: .infinity, alignment: .leading)
             }
         } else { Text("Can't reach the diary").font(.caption).foregroundStyle(Look.muted) }
+    }
+}
+
+// MARK: - A picture of us 📷
+
+struct PhotoEntry: TimelineEntry {
+    var date = Date()
+    var photo: PhotoOfUs?
+    var setUp = true
+}
+
+struct PhotoProvider: TimelineProvider {
+    func placeholder(in context: Context) -> PhotoEntry { PhotoEntry() }
+
+    func getSnapshot(in context: Context, completion: @escaping (PhotoEntry) -> Void) {
+        if context.isPreview { return completion(PhotoEntry()) }
+        Task { completion(await entry()) }
+    }
+
+    // A different picture every 3 hours.
+    func getTimeline(in context: Context, completion: @escaping (Timeline<PhotoEntry>) -> Void) {
+        Task { completion(Timeline(entries: [await entry()], policy: .after(Date().addingTimeInterval(3 * 3600)))) }
+    }
+
+    private func entry() async -> PhotoEntry {
+        guard DiaryKit.isSetUp else { return PhotoEntry(setUp: false) }
+        let turn = Int(Date().timeIntervalSince1970 / (3 * 3600))
+        return PhotoEntry(photo: try? await DiaryKit.photoOfUs(turn: turn))
+    }
+}
+
+struct PhotoWidget: Widget {
+    var body: some WidgetConfiguration {
+        StaticConfiguration(kind: "PhotoOfUs", provider: PhotoProvider()) { entry in
+            PhotoView(entry: entry)
+        }
+        .configurationDisplayName("A picture of us")
+        .description("One of our diary's pictures, a new one every few hours.")
+        .supportedFamilies([.systemSmall, .systemMedium, .systemLarge])
+        .contentMarginsDisabled()
+    }
+}
+
+struct PhotoView: View {
+    var entry: PhotoEntry
+
+    var body: some View {
+        Group {
+            if !entry.setUp {
+                SetUpView().containerBackground(Look.background, for: .widget)
+            } else if let photo = entry.photo, let image = UIImage(data: photo.jpeg) {
+                ZStack(alignment: .bottomLeading) {
+                    Color.clear
+                    if let caption = photo.caption, !caption.isEmpty {
+                        Text(caption)
+                            .font(Look.script(15))
+                            .foregroundStyle(.white)
+                            .lineLimit(2)
+                            .shadow(color: .black.opacity(0.6), radius: 3)
+                            .padding(12)
+                    }
+                }
+                .containerBackground(for: .widget) {
+                    Image(uiImage: image).resizable().scaledToFill()
+                        .overlay(LinearGradient(colors: [.clear, .black.opacity(0.35)], startPoint: .center, endPoint: .bottom))
+                }
+                .widgetURL(URL(string: "ourdiary://open/\(photo.pageID)"))
+            } else {
+                VStack(spacing: 6) {
+                    Text("📷").font(.largeTitle)
+                    Text("pictures load when there's internet").font(.caption).foregroundStyle(Look.muted).multilineTextAlignment(.center)
+                }
+                .containerBackground(Look.background, for: .widget)
+            }
+        }
     }
 }
