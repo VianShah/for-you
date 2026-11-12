@@ -220,7 +220,7 @@ textarea.field.hand { font-family: var(--hand); font-size: 24px; line-height: 1.
 @media (max-width: 380px) { .grid { grid-template-columns: 1fr; } .voice { grid-column: auto; } }
 
 /* ================= diary ↔ games nav ================= */
-.sections { display: inline-flex; gap: 4px; margin-top: 22px; padding: 4px; border-radius: 999px; background: rgba(110,35,55,.07); }
+.sections { display: inline-flex; flex-wrap: wrap; justify-content: center; gap: 4px; margin-top: 22px; padding: 4px; border-radius: 999px; background: rgba(110,35,55,.07); }
 .section { padding: 9px 18px; border-radius: 999px; font-size: 14px; color: var(--ink); text-decoration: none; }
 .section.on { background: var(--paper); color: var(--wine); box-shadow: 0 2px 8px rgba(110,35,55,.12); }
 
@@ -899,3 +899,88 @@ body[data-day-theme="photo"]::before { background: linear-gradient(rgba(251,245,
 @media (prefers-reduced-motion: reduce) { .gift-coin { animation: none; } }
 .surprise-pop { overflow: hidden; }
 .surprise-pop .sheet { position: relative; z-index: 1; }
+
+/* ---------- the "us" page: feelings, letters, bucket list, recap ---------- */
+.moods { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; margin-bottom: 12px; }
+.mood { display: grid; justify-items: center; gap: 2px; padding: 10px 4px; border-radius: 16px; border: 2px solid transparent; background: var(--paper); color: var(--ink);
+  box-shadow: 0 8px 18px -14px rgba(110,35,55,.5); transition: transform .12s, border-color .12s, background .12s; }
+.mood span { font-size: 30px; line-height: 1.1; }
+.mood small { font-size: 12px; color: var(--muted); }
+.mood.on { border-color: var(--rose); background: var(--blush); transform: translateY(-2px); }
+.mood-row { display: flex; gap: 8px; margin-bottom: 10px; align-items: stretch; }
+.mood-row .field { flex: 1; margin: 0; min-width: 0; }
+.mood-row .save { white-space: nowrap; }
+.mood-card { display: flex; gap: 12px; align-items: center; background: var(--paper); color: var(--ink); border-radius: 16px; padding: 12px 16px; margin: 12px 0; box-shadow: 0 14px 30px -20px rgba(110,35,55,.45); }
+.mood-big { font-size: 42px; line-height: 1; }
+.mood-card b { font-weight: 400; font-size: 16px; }
+.mood-card p { font-family: var(--hand); font-size: 24px; line-height: 1.15; }
+.mood-week { display: grid; grid-template-columns: repeat(7, 1fr); gap: 4px; text-align: center; font-size: 11px; color: var(--muted); }
+.mood-week .d { display: grid; gap: 2px; padding: 6px 0; border-radius: 10px; background: rgba(110,35,55,.05); }
+.mood-week .d.today { background: var(--blush); color: var(--wine); }
+.mood-week i { font-style: normal; font-size: 18px; min-height: 24px; }
+.mood-legend { grid-column: 1 / -1; margin-top: 4px; }
+
+.letter-draft, .letter-card { background: var(--paper); color: var(--ink); border-radius: 14px; padding: 18px; box-shadow: 0 14px 30px -18px rgba(110,35,55,.45); position: relative; }
+.letter-draft small, .letter-card small { display: block; font-size: 11px; letter-spacing: .2em; text-transform: uppercase; color: var(--rose); margin-bottom: 6px; }
+.letter-topic { font-family: var(--script); font-size: clamp(30px, 8vw, 38px); line-height: 1.05; color: var(--wine); margin-bottom: 6px; }
+.letter-draft .field { margin: 8px 0 0; }
+.letter-card.locked { text-align: center; background-image: linear-gradient(135deg, rgba(243,217,212,.5), transparent 60%); }
+.letter-card.locked .save { margin-top: 8px; }
+.letter-seal { font-size: 46px; line-height: 1; margin-bottom: 4px; }
+.letter-card .game-actions { margin-top: 10px; justify-content: flex-start; }
+.letter-sheet { max-height: 90vh; overflow: auto; overscroll-behavior: contain; }
+.letter-from { display: block; font-size: 12px; letter-spacing: .15em; text-transform: uppercase; color: var(--rose); margin-bottom: 10px; }
+.letter-text { font-family: var(--hand); font-size: 26px; line-height: 1.4; white-space: pre-wrap; color: var(--ink); }
+.letter-sign { font-family: var(--hand); font-size: 30px; color: var(--wine); text-align: right; margin-top: 8px; }
+.letter-draft .hint, .letter-card .hint { text-align: left; }
+
+.bk-progress { margin-bottom: 14px; }
+.bk-prog { display: grid; gap: 6px; font-size: 14px; color: var(--muted); }
+.bk-prog b { font-weight: 400; color: var(--ink); }
+.bk-add { margin-bottom: 14px; display: grid; gap: 8px; }
+.bk-add .cats { margin-bottom: 0; justify-content: flex-start; }
+.bk-add .field { margin: 0; }
+.bk-list { display: grid; gap: 8px; }
+.bk-item { display: flex; align-items: flex-start; gap: 12px; background: var(--paper); color: var(--ink); border-radius: 14px; padding: 12px 14px; box-shadow: 0 10px 22px -18px rgba(110,35,55,.5); }
+.bk-tick { flex: none; width: 30px; height: 30px; border-radius: 50%; border: 2px solid var(--rose); color: #fff; font-size: 16px; display: grid; place-items: center; margin-top: 2px; }
+.bk-item.done .bk-tick { background: var(--rose); }
+.bk-main { flex: 1; min-width: 0; }
+.bk-main b { font-weight: 400; font-size: 17px; overflow-wrap: anywhere; }
+.bk-item.done .bk-main b { text-decoration: line-through; opacity: .65; }
+.bk-main small { display: block; font-size: 12px; color: var(--muted); margin-top: 2px; }
+.bk-main p { font-size: 14px; margin-top: 4px; opacity: .85; }
+.bk-main .bk-memory { font-family: var(--hand); font-size: 20px; color: var(--wine); opacity: 1; }
+.bk-x { flex: none; width: 28px; height: 28px; border-radius: 50%; color: var(--muted); font-size: 14px; opacity: .6; }
+.bk-x:hover { opacity: 1; }
+#bkDoneBox .bk-list { margin-top: 10px; }
+
+.recap-nav { display: flex; align-items: center; justify-content: center; gap: 16px; margin-bottom: 14px; }
+.recap-nav b { font-weight: 400; font-size: 17px; min-width: 190px; text-align: center; }
+.recap-nav .icon-btn { font-size: 22px; line-height: 1; }
+.recap-nav .icon-btn:disabled { opacity: .3; }
+.recap-card { background: var(--paper); color: var(--ink); border-radius: 18px; padding: 22px 18px; box-shadow: 0 20px 40px -26px rgba(110,35,55,.55); display: grid; gap: 16px; }
+.recap-title { font-family: var(--script); font-size: clamp(44px, 12vw, 64px); line-height: 1; color: var(--wine); text-align: center; }
+.recap-collage { display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; }
+.recap-collage.c1 { grid-template-columns: 1fr; } .recap-collage.c2, .recap-collage.c4 { grid-template-columns: repeat(2, 1fr); }
+.recap-collage img { width: 100%; aspect-ratio: 1; object-fit: cover; border-radius: 10px; display: block; }
+.stats { display: grid; grid-template-columns: repeat(auto-fit, minmax(120px, 1fr)); gap: 10px; }
+.stat { text-align: center; background: rgba(243,217,212,.45); border-radius: 14px; padding: 12px 6px; display: grid; gap: 2px; }
+.stat b { font-family: var(--script); font-weight: 400; font-size: 40px; line-height: 1; color: var(--wine); }
+.stat span { font-size: 12px; color: var(--muted); }
+.recap-people { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+.recap-person { border: 1px dashed var(--line); border-radius: 14px; padding: 10px 12px; display: grid; gap: 3px; font-size: 13px; color: var(--muted); }
+.recap-person.me { border-style: solid; border-color: var(--rose); background: var(--blush); color: var(--wine); }
+.recap-person b { font-weight: 400; font-size: 16px; color: var(--ink); }
+.recap-lines { list-style: none; display: grid; gap: 8px; font-size: 15px; line-height: 1.45; }
+.recap-lines b { font-weight: 500; }
+:root[data-theme="dark"] .letter-draft .hint, :root[data-theme="dark"] .letter-card .hint, :root[data-theme="dark"] .recap-card .hint { color: #8a6a70; }
+:root[data-theme="dark"] .mood-week .d { background: rgba(255,255,255,.05); }
+:root[data-theme="dark"] .mood-week .d.today { background: rgba(163,58,85,.35); color: #f2a7b1; }
+:root[data-theme="dark"] .recap-card .stat { background: rgba(110,35,55,.12); }
+:root[data-theme="dark"] .recap-nav b { color: #f2e4e7; }
+@media (max-width: 420px) { .moods { grid-template-columns: repeat(4, 1fr); gap: 6px; } .mood span { font-size: 26px; } .recap-people { grid-template-columns: 1fr; } }
+@media (max-width: 430px) { .sections { gap: 2px; } .section { padding: 8px 10px; font-size: 12.5px; } }
+:root[data-theme="dark"] .bk-prog b, :root[data-theme="dark"] .mood-legend { color: #f2e4e7; }
+:root[data-theme="dark"] .bk-prog { color: #b79ca2; }
+:root[data-theme="dark"] .letter-sheet .letter-text { color: #f2e4e7; }
+:root[data-theme="dark"] .letter-sheet .letter-sign { color: #f2a7b1; }

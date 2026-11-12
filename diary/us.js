@@ -12,6 +12,7 @@ const RL = () => Goldies.RULES;
 const smooth = el => el?.scrollIntoView({ behavior: reduceMotion ? "auto" : "smooth", block: "center" });
 
 function needSetup() {
+  if (typeof DEMO !== "undefined" && DEMO) { openGate(); return true; } // the sample diary: start your own first
   if (!KEY || !NAME) { toast("Set this phone up in the diary first 🔑"); return true; }
   return false;
 }
@@ -28,7 +29,7 @@ async function usSave(change, message) {
 let moodPick = null;
 const moodOf = (name, day) => allPages.find(e => e.type === "mood" && e.by === name && e.day === day);
 function renderMood() {
-  const today = dayKey(), mine = NAME && moodOf(NAME, today), theirs = NAME && moodOf(other(), today);
+  const today = dayKey(), mine = NAME && moodOf(NAME, today), theirs = moodOf(other(), today);
   const sel = moodPick || mine?.mood || "";
   $("#moodPick").innerHTML = MOODS.map(m => `<button type="button" class="mood${sel === m.id ? " on" : ""}" data-mood="${m.id}"><span>${m.emoji}</span><small>${m.label}</small></button>`).join("");
   const note = $("#moodNote");
@@ -42,7 +43,7 @@ function renderMood() {
     : `<p class="hint">${esc(other())} hasn't checked in today yet.</p>`;
   const days = Array.from({ length: 7 }, (_, i) => { const d = new Date(); d.setDate(d.getDate() - (6 - i)); return d; });
   $("#moodWeek").innerHTML = days.map(d => {
-    const k = dayKey(d), a = NAME && moodOf(NAME, k), b = NAME && moodOf(other(), k);
+    const k = dayKey(d), a = NAME && moodOf(NAME, k), b = moodOf(other(), k);
     return `<div class="d${k === today ? " today" : ""}"><span>${d.toLocaleDateString("en-GB", { weekday: "short" }).slice(0, 2)}</span><i>${a ? moodById(a.mood)?.emoji || "" : ""}</i><i>${b ? moodById(b.mood)?.emoji || "" : ""}</i></div>`;
   }).join("") + `<p class="hint mood-legend">top: you · bottom: ${esc(other())}</p>`;
 }

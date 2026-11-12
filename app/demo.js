@@ -35,5 +35,12 @@ function demoEntries(now = Date.now()) {
       caption: "the evening we didn't want to end", media: "diary/demo/sunset.jpg", hearts: [A, M] },
     { id: "demo-9", type: "note", author: M, by: M, at: ago(98), spent: 95, paper: "kraft", stickers: ["🍫"], title: "a tiny list",
       text: "Things that made me smile today:\n1. your voice note at 7am\n2. the dog outside the café\n3. you, again" },
+    // the "us" page: a mood, a bucket list and a letter
+    { id: "demo-m1", type: "mood", by: M, day: new Date(now - 1.5 * 3600e3).toLocaleDateString("en-CA"), at: ago(1.5), mood: "loved", note: "best chai of the week" },
+    { id: "demo-b1", type: "bucket", by: A, at: ago(40), cat: "movie", title: "Watch La La Land together", note: "popcorn and a blanket" },
+    { id: "demo-b2", type: "bucket", by: M, at: ago(38), cat: "place", title: "Sunrise at Marine Drive" },
+    { id: "demo-b3", type: "bucket", by: A, at: ago(30), cat: "reel", title: "Our first couple reel" },
+    { id: "demo-b4", type: "bucket", by: M, at: ago(60), cat: "todo", title: "Pottery class", done: { by: A, at: ago(20), note: "mine looked like a bowl, hers looked like art" } },
+    { id: "demo-l1", type: "letter", by: M, to: A, at: ago(8), topic: { id: "miss-me", title: "Open when you miss me" }, text: "Hi you. If you're reading this, you miss me. Good. I miss you too, so here's a hug through the screen." },
   ];
 }

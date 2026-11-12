@@ -181,6 +181,8 @@ function goldieeNudge() {
   const g = window.goldiee; if (!g) return;
   if (!KEY || !NAME) return g.say("this phone isn't set up to write yet 🔑", "./", "set it up →");
   if (goldieeCry(allPages, "./")) return;
+  const us = usWaiting(allPages);
+  if (us) return g.say(us.msg, () => { us.seen?.(); location.href = us.page; }, us.label);
   const waiting = entries.find(e => e.prompt && !e.together && e.author !== NAME && !answeredBy(entries, NAME, e.prompt.id));
   if (waiting) return g.say(`${waiting.author} answered a question. Answer it too to see theirs 💭`, answerLink(waiting.prompt), "answer it →");
   const kw = kwWaitingOnMe()[0];
